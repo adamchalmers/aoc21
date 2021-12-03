@@ -1,7 +1,6 @@
 fn main() {
     let lines: Vec<Vec<bool>> = read(include_str!("input.txt")).collect();
-    let summary = BinarySummary::ingest(lines.iter());
-    println!("Q1: {}", summary.power_usage());
+    println!("Q1: {}", power_usage(lines.iter()));
 
     let co2 = Q2 {
         lines: lines.clone(),
@@ -20,29 +19,22 @@ fn read(s: &str) -> impl Iterator<Item = Vec<bool>> + '_ {
     s.lines().map(|s| s.chars().map(|c| c != '0').collect())
 }
 
-#[derive(Default)]
-struct BinarySummary(Vec<bool>);
+fn power_usage<'a, I>(mut lines: I) -> u32
+where
+    I: Iterator<Item = &'a Vec<bool>>,
+{
+    let sign = |bit: &bool| if *bit { 1 } else { -1 };
+    let first_line_signs: Vec<i32> = lines.next().unwrap().iter().map(sign).collect();
 
-impl BinarySummary {
-    fn ingest<'a, I>(mut lines: I) -> Self
-    where
-        I: Iterator<Item = &'a Vec<bool>>,
-    {
-        let first: Vec<i32> = lines.next().unwrap().iter().map(|_| 0).collect();
-
-        let summary = lines.fold(first, |mut acc, binary| {
-            for (column, bit) in binary.iter().enumerate() {
-                acc[column] += if *bit { 1 } else { -1 };
-            }
-            acc
-        });
-        BinarySummary(summary.iter().map(|&i| i > 0).collect())
-    }
-
-    fn power_usage(&self) -> u32 {
-        let (gamma, epsilon) = binary_to_number(&self.0);
-        gamma * epsilon
-    }
+    let summary = lines.fold(first_line_signs, |mut total_signs, binary| {
+        for (column, bit) in binary.iter().enumerate() {
+            total_signs[column] += sign(bit);
+        }
+        total_signs
+    });
+    let totals: Vec<_> = summary.iter().map(|&sign| sign > 0).collect();
+    let (gamma, epsilon) = binary_to_number(&totals);
+    gamma * epsilon
 }
 
 fn binary_to_number(bits: &[bool]) -> (u32, u32) {
@@ -85,19 +77,18 @@ impl Q2 {
 
     fn apply_bit_criteria(&mut self, bit: usize) {
         // Find the criteria
-        let mut zeros = 0;
-        let mut ones = 0;
+        let mut delta = 0;
         for line in &self.lines {
             if line[bit] {
-                ones += 1;
+                delta += 1;
             } else {
-                zeros += 1;
+                delta -= 1;
             }
         }
         let criteria = if matches!(self.gas, Gas::Oxygen) {
-            zeros <= ones
+            0 <= delta
         } else {
-            zeros > ones
+            0 > delta
         };
         // Apply the bit criteria
         self.lines.retain(|line| line[bit] == criteria);
@@ -111,8 +102,7 @@ mod tests {
     #[test]
     fn test_q1() {
         let lines: Vec<Vec<bool>> = read(include_str!("example.txt")).collect();
-        let summary = BinarySummary::ingest(lines.iter());
-        assert_eq!(summary.power_usage(), 198);
+        assert_eq!(power_usage(lines.iter()), 198);
     }
 
     #[test]
