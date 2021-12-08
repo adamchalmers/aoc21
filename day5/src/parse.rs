@@ -8,21 +8,23 @@ use nom::{
 };
 use std::str::FromStr;
 
-/// Parse a Line from the input string
-fn parse_line(s: &str) -> IResult<&str, Line> {
+/// Parse a Line from the input string.
+/// Note this is a Nom parser, so it takes in an input string, and consumes characters from it until it parses a Line.
+/// If successful, it returns the match, plus the remaining part of the input string which wasn't consumed.
+fn parse_line(input: &str) -> IResult<&str, Line> {
     // Parse two points, separated by an arrow
     let parser = separated_pair(parse_point, tag(" -> "), parse_point);
     // If the parse succeeded, put those two points into a Line
-    map(parser, |(p0, p1)| Line(p0, p1))(s)
+    map(parser, |(p0, p1)| Line(p0, p1))(input)
 }
 
-/// Parse a point from the input string.
-fn parse_point(s: &str) -> IResult<&str, Point> {
+/// Parse a point from the start of the input string.
+fn parse_point(input: &str) -> IResult<&str, Point> {
     let parser = separated_pair(parse_numbers, tag(","), parse_numbers);
-    map(parser, |(x, y)| Point { x, y })(s)
+    map(parser, |(x, y)| Point { x, y })(input)
 }
 
-/// Match a `Scale` from the start of the input.
+/// Parse a `Scale` from the start of the input string.
 pub fn parse_numbers(input: &str) -> IResult<&str, Scale> {
     map_res(take_while(|c: char| c.is_digit(10)), |input| {
         Scale::from_str(input)

@@ -15,7 +15,7 @@ fn solve(lines: &[Line]) -> (usize, usize) {
     let mut straight_counter = Counter::default();
     let mut all_counter = Counter::default();
     for l in lines {
-        for p in l.points() {
+        for p in l.points_in_line() {
             if l.is_straight() {
                 straight_counter.add(p);
             }

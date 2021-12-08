@@ -8,13 +8,12 @@ pub struct Point {
     pub y: Scale,
 }
 
-/// For now, this must be horizontal or vertical.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Debug)]
 pub struct Line(pub Point, pub Point);
 
 impl Line {
     /// Get all points along this line
-    pub fn points(&self) -> impl Iterator<Item = Point> {
+    pub fn points_in_line(&self) -> impl Iterator<Item = Point> {
         PointsInLine {
             started: false,
             curr: self.0,
@@ -38,22 +37,26 @@ impl Iterator for PointsInLine {
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.started {
+            // First point
             self.started = true;
             return Some(self.curr);
         } else if self.curr == self.end {
+            // Last point
             return None;
         }
 
         // move `curr` one step along the line, whichever direction
         // it needs to go.
-        match self.curr.x.cmp(&self.end.x) {
-            Ordering::Less => self.curr.x += 1,
-            Ordering::Greater => self.curr.x -= 1,
+        let x = &mut self.curr.x;
+        match (*x).cmp(&self.end.x) {
+            Ordering::Less => *x += 1,
+            Ordering::Greater => *x -= 1,
             _ => {}
         }
-        match self.curr.y.cmp(&self.end.y) {
-            Ordering::Less => self.curr.y += 1,
-            Ordering::Greater => self.curr.y -= 1,
+        let y = &mut self.curr.y;
+        match (*y).cmp(&self.end.y) {
+            Ordering::Less => *y += 1,
+            Ordering::Greater => *y -= 1,
             _ => {}
         };
         Some(self.curr)
@@ -72,7 +75,7 @@ mod tests {
             Point { x: 0, y: 3 },
             Point { x: 0, y: 4 },
         ];
-        let actual: Vec<_> = l.points().into_iter().collect();
+        let actual: Vec<_> = l.points_in_line().into_iter().collect();
         assert_eq!(expected, actual);
     }
 
@@ -80,7 +83,7 @@ mod tests {
     fn test_points_in_one_point_line() {
         let l = Line(Point { x: 0, y: 2 }, Point { x: 0, y: 2 });
         let expected = vec![Point { x: 0, y: 2 }];
-        let actual: Vec<_> = l.points().into_iter().collect();
+        let actual: Vec<_> = l.points_in_line().into_iter().collect();
         assert_eq!(expected, actual);
     }
 }
