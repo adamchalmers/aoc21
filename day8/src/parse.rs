@@ -8,50 +8,17 @@ use nom::{
 use std::collections::BTreeSet;
 use std::convert::TryInto;
 
-pub type Pattern = BTreeSet<Segment>;
-
-#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum Segment {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-}
-
-impl TryFrom<char> for Segment {
-    type Error = &'static str;
-
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        let seg = match value {
-            'a' => Self::A,
-            'b' => Self::B,
-            'c' => Self::C,
-            'd' => Self::D,
-            'e' => Self::E,
-            'f' => Self::F,
-            'g' => Self::G,
-            _ => return Err("not a segment"),
-        };
-        Ok(seg)
-    }
-}
+pub type Pattern = BTreeSet<char>;
 
 fn is_segment(c: char) -> bool {
-    Segment::try_from(c).is_ok()
+    c >= 'a' && c <= 'g'
 }
 
 fn to_segs(s: &str) -> Result<Pattern, &'static str> {
     if s.is_empty() {
         return Err("cannot have empty set of segments");
     }
-    let mut set = BTreeSet::default();
-    for c in s.chars() {
-        set.insert(Segment::try_from(c)?);
-    }
-    Ok(set)
+    Ok(s.chars().collect())
 }
 
 pub struct DisplayPanel {
@@ -97,7 +64,7 @@ mod tests {
     #[test]
     fn parse_segments() {
         let actual = segments_parser("ab").unwrap().1;
-        assert_eq!(actual, BTreeSet::from([Segment::A, Segment::B]))
+        assert_eq!(actual, BTreeSet::from(['a', 'b']))
     }
 
     #[test]
@@ -105,20 +72,14 @@ mod tests {
         let actual = signal_patterns_parser("ab def ").unwrap().1;
         assert_eq!(
             actual,
-            vec![
-                BTreeSet::from([Segment::A, Segment::B]),
-                BTreeSet::from([Segment::D, Segment::E, Segment::F]),
-            ]
+            vec![BTreeSet::from(['a', 'b']), BTreeSet::from(['d', 'e', 'f']),]
         )
     }
 
     #[test]
     fn parse_line() {
         let actual = DisplayPanel::parse(include_str!("tiny.txt")).unwrap().1;
-        assert_eq!(
-            actual.signal_patterns[9],
-            BTreeSet::from([Segment::A, Segment::B])
-        );
+        assert_eq!(actual.signal_patterns[9], BTreeSet::from(['a', 'b']));
     }
 
     #[test]
