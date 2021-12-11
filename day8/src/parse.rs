@@ -53,24 +53,30 @@ fn to_segs(s: &str) -> Result<HashSet<Segment>, &'static str> {
 }
 
 pub struct Observation {
-    patterns: [HashSet<Segment>; 10],
-    pub output: [HashSet<Segment>; 4],
+    signal_patterns: [HashSet<Segment>; 10],
+    pub output_value: [HashSet<Segment>; 4],
 }
 
 impl Observation {
     fn parse(input: &str) -> IResult<&str, Self> {
-        let (input, (patterns, output)) =
-            separated_pair(patterns_parser, tag(" | "), patterns_parser)(input)?;
-        let patterns = patterns.try_into().unwrap();
-        let output = output.try_into().unwrap();
-        Ok((input, Self { patterns, output }))
+        let (input, (signal_patterns, output_value)) =
+            separated_pair(signal_patterns_parser, tag(" | "), signal_patterns_parser)(input)?;
+        let signal_patterns = signal_patterns.try_into().unwrap();
+        let output_value = output_value.try_into().unwrap();
+        Ok((
+            input,
+            Self {
+                signal_patterns,
+                output_value,
+            },
+        ))
     }
     pub fn parse_lines(input: &str) -> IResult<&str, Vec<Self>> {
         separated_list1(tag("\n"), Observation::parse)(input)
     }
 }
 
-fn patterns_parser(input: &str) -> IResult<&str, Vec<HashSet<Segment>>> {
+fn signal_patterns_parser(input: &str) -> IResult<&str, Vec<HashSet<Segment>>> {
     separated_list1(tag(" "), segments_parser)(input)
 }
 
@@ -89,8 +95,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_patterns() {
-        let actual = patterns_parser("ab def ").unwrap().1;
+    fn parse_signal_patterns() {
+        let actual = signal_patterns_parser("ab def ").unwrap().1;
         assert_eq!(
             actual,
             vec![
@@ -103,7 +109,10 @@ mod tests {
     #[test]
     fn parse_line() {
         let actual = Observation::parse(include_str!("tiny.txt")).unwrap().1;
-        assert_eq!(actual.patterns[9], HashSet::from([Segment::A, Segment::B]));
+        assert_eq!(
+            actual.signal_patterns[9],
+            HashSet::from([Segment::A, Segment::B])
+        );
     }
 
     #[test]

@@ -1,13 +1,14 @@
 use parse::Observation;
 use std::collections::HashSet;
-
 mod parse;
+
 fn main() {
     let observations = Observation::parse_lines(include_str!("input.txt"))
         .unwrap()
         .1;
     let q1 = count_unique_len(&observations);
     println!("Q1: {}", q1);
+    // We can figure out which wire controls segment A by doing segments(7) - segments(1).
 }
 
 fn count_unique_len(observations: &[Observation]) -> usize {
@@ -15,13 +16,14 @@ fn count_unique_len(observations: &[Observation]) -> usize {
     observations
         .iter()
         .map(|p| {
-            p.output
+            p.output_value
                 .iter()
                 .filter(|segs| unique_len.contains(&segs.len()))
                 .count()
         })
         .sum()
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
