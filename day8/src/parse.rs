@@ -5,8 +5,10 @@ use nom::{
     sequence::separated_pair,
     IResult,
 };
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::convert::TryInto;
+
+pub type Pattern = BTreeSet<Segment>;
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Segment {
@@ -41,23 +43,25 @@ fn is_segment(c: char) -> bool {
     Segment::try_from(c).is_ok()
 }
 
-fn to_segs(s: &str) -> Result<HashSet<Segment>, &'static str> {
+fn to_segs(s: &str) -> Result<Pattern, &'static str> {
     if s.is_empty() {
         return Err("cannot have empty set of segments");
     }
-    let mut set = HashSet::default();
+    let mut set = BTreeSet::default();
     for c in s.chars() {
         set.insert(Segment::try_from(c)?);
     }
     Ok(set)
 }
 
-pub struct Observation {
-    signal_patterns: [HashSet<Segment>; 10],
-    pub output_value: [HashSet<Segment>; 4],
+pub struct DisplayPanel {
+    /// The ten different signal patterns this display uses, one for each digit.
+    pub signal_patterns: [Pattern; 10],
+    /// The signal patterns this display is currently using to show a 4-digit number.
+    pub output_value: [Pattern; 4],
 }
 
-impl Observation {
+impl DisplayPanel {
     fn parse(input: &str) -> IResult<&str, Self> {
         let (input, (signal_patterns, output_value)) =
             separated_pair(signal_patterns_parser, tag(" | "), signal_patterns_parser)(input)?;
@@ -72,15 +76,17 @@ impl Observation {
         ))
     }
     pub fn parse_lines(input: &str) -> IResult<&str, Vec<Self>> {
-        separated_list1(tag("\n"), Observation::parse)(input)
+        separated_list1(tag("\n"), DisplayPanel::parse)(input)
     }
 }
 
-fn signal_patterns_parser(input: &str) -> IResult<&str, Vec<HashSet<Segment>>> {
+/// Parse a series of patterns.
+fn signal_patterns_parser(input: &str) -> IResult<&str, Vec<Pattern>> {
     separated_list1(tag(" "), segments_parser)(input)
 }
 
-fn segments_parser(input: &str) -> IResult<&str, HashSet<Segment>> {
+/// Parse a series of consecutive characters a-g, into a set of segments aka a pattern.
+fn segments_parser(input: &str) -> IResult<&str, Pattern> {
     map_res(take_while(is_segment), to_segs)(input)
 }
 
@@ -91,7 +97,7 @@ mod tests {
     #[test]
     fn parse_segments() {
         let actual = segments_parser("ab").unwrap().1;
-        assert_eq!(actual, HashSet::from([Segment::A, Segment::B]))
+        assert_eq!(actual, BTreeSet::from([Segment::A, Segment::B]))
     }
 
     #[test]
@@ -100,23 +106,23 @@ mod tests {
         assert_eq!(
             actual,
             vec![
-                HashSet::from([Segment::A, Segment::B]),
-                HashSet::from([Segment::D, Segment::E, Segment::F]),
+                BTreeSet::from([Segment::A, Segment::B]),
+                BTreeSet::from([Segment::D, Segment::E, Segment::F]),
             ]
         )
     }
 
     #[test]
     fn parse_line() {
-        let actual = Observation::parse(include_str!("tiny.txt")).unwrap().1;
+        let actual = DisplayPanel::parse(include_str!("tiny.txt")).unwrap().1;
         assert_eq!(
             actual.signal_patterns[9],
-            HashSet::from([Segment::A, Segment::B])
+            BTreeSet::from([Segment::A, Segment::B])
         );
     }
 
     #[test]
-    fn parse_observation() {
-        Observation::parse_lines(include_str!("example.txt")).unwrap();
+    fn parse_display_panel() {
+        DisplayPanel::parse_lines(include_str!("example.txt")).unwrap();
     }
 }

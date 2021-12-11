@@ -1,19 +1,21 @@
-use parse::Observation;
-use std::collections::HashSet;
+use parse::DisplayPanel;
+use std::collections::BTreeSet;
+mod deduction;
 mod parse;
 
 fn main() {
-    let observations = Observation::parse_lines(include_str!("input.txt"))
+    let display_panels = DisplayPanel::parse_lines(include_str!("input.txt"))
         .unwrap()
         .1;
-    let q1 = count_unique_len(&observations);
+    let q1 = count_unique_len(&display_panels);
     println!("Q1: {}", q1);
-    // We can figure out which wire controls segment A by doing segments(7) - segments(1).
+    let q2: usize = display_panels.into_iter().map(deduction::solve).sum();
+    println!("Q2: {}", q2);
 }
 
-fn count_unique_len(observations: &[Observation]) -> usize {
-    let unique_len: HashSet<_> = HashSet::from([2, 3, 4, 7]);
-    observations
+fn count_unique_len(display_panels: &[DisplayPanel]) -> usize {
+    let unique_len: BTreeSet<_> = BTreeSet::from([2, 3, 4, 7]);
+    display_panels
         .iter()
         .map(|p| {
             p.output_value
@@ -30,11 +32,25 @@ mod tests {
 
     #[test]
     fn test_count_unique_len() {
-        let observations = Observation::parse_lines(include_str!("example.txt"))
+        let display_panels = DisplayPanel::parse_lines(include_str!("example.txt"))
             .unwrap()
             .1;
-        let actual = count_unique_len(&observations);
+        let actual = count_unique_len(&display_panels);
         let expected = 26;
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_solve() {
+        // Parse the file (which only has one line).
+        let mut display_panels = DisplayPanel::parse_lines(include_str!("tiny.txt"))
+            .unwrap()
+            .1;
+        assert_eq!(display_panels.len(), 1);
+        let display_panel = display_panels.pop().unwrap();
+
+        // Check the answer.
+        let actual = deduction::solve(display_panel);
+        assert_eq!(5353, actual);
     }
 }
