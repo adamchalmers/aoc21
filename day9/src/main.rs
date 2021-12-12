@@ -2,7 +2,6 @@ mod counter;
 
 use cached::proc_macro::cached;
 use counter::Counter;
-use std::collections::HashSet;
 
 fn main() {
     let g = Grid::parse(include_str!("input.txt"));
@@ -16,12 +15,7 @@ struct Point {
     y: usize,
 }
 
-impl std::fmt::Display for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({},{})", self.x, self.y)
-    }
-}
-
+/// 2D grid type
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct Grid {
     width: usize,
@@ -38,6 +32,7 @@ impl Grid {
         }
     }
 
+    /// Parse from AoC problem input textfile.
     fn parse(s: &str) -> Self {
         let y = s.lines().count();
         let x = s.lines().next().unwrap().len();
@@ -49,38 +44,36 @@ impl Grid {
         }
         g
     }
-    fn adjacent(&self, p: Point) -> HashSet<Point> {
-        let mut out = HashSet::new();
+
+    /// Get all cells adjacent to the given point.
+    /// Usually there will be 4, but if the point is an edge/corner there will only be
+    /// 3 or 2.
+    fn adjacent(&self, p: Point) -> impl Iterator<Item = Point> {
+        let mut out = Vec::new();
         if p.x < self.width - 1 {
-            out.insert(Point { x: p.x + 1, ..p });
+            out.push(Point { x: p.x + 1, ..p });
         }
         if p.x > 0 {
-            out.insert(Point { x: p.x - 1, ..p });
+            out.push(Point { x: p.x - 1, ..p });
         }
         if p.y < self.height - 1 {
-            out.insert(Point { y: p.y + 1, ..p });
+            out.push(Point { y: p.y + 1, ..p });
         }
         if p.y > 0 {
-            out.insert(Point { y: p.y - 1, ..p });
+            out.push(Point { y: p.y - 1, ..p });
         }
-        out
+        out.into_iter()
     }
+
     /// Iterate over all points in this grid.
     fn all_points(&self) -> impl Iterator<Item = Point> + '_ {
         (0..self.height).flat_map(|y| (0..self.width).map(move |x| Point { x, y }))
     }
+
     fn get(&self, p: Point) -> u16 {
         self.cells[p.y][p.x]
     }
-}
 
-fn find_low_points(g: &Grid) -> Vec<Point> {
-    g.all_points()
-        .filter(|p| g.adjacent(*p).iter().all(|adj| g.get(*adj) > g.get(*p)))
-        .collect()
-}
-
-impl Grid {
     fn total_low_point_risk(&self) -> u16 {
         find_low_points(self)
             .into_iter()
@@ -89,45 +82,50 @@ impl Grid {
     }
 }
 
+/// Find all points which have no downhill neighbours.
+fn find_low_points(g: &Grid) -> Vec<Point> {
+    g.all_points()
+        .filter(|p| g.adjacent(*p).all(|adj| g.get(adj) > g.get(*p)))
+        .collect()
+}
+
+/// Find the neighbour most steeply downhill from this point,
+/// if one exists.
 fn downhill_from(g: &Grid, p: Point) -> Option<Point> {
     if g.get(p) == 9 {
         return None;
     }
     let curr_depth = g.get(p);
-    let next = g
-        .adjacent(p)
+    g.adjacent(p)
         .into_iter()
         .map(|adj| (adj, g.get(adj)))
         .filter(|(_adj, depth)| depth < &curr_depth)
         .min_by(|(_p1, val1), (_p2, val2)| val1.cmp(val2))
-        .map(|(p, _)| p)?;
-    Some(next)
+        .map(|(p, _)| p)
 }
 
+/// Find the basin this point is part of.
 #[cached]
-fn basin_of(g: Grid, p: Point) -> Option<Point> {
-    let next = match downhill_from(&g, p) {
-        Some(next) => next,
-        None => return Some(p),
+fn basin_of(g: Grid, point: Point) -> Option<Point> {
+    let downhill = match downhill_from(&g, point) {
+        Some(p) => p,
+        None => return Some(point),
     };
-    let basin = basin_of(g, next)?;
-    Some(basin)
+    basin_of(g, downhill)
 }
 
-fn all_basins_sizes(g: Grid) -> Vec<(Point, u16)> {
+/// Get the size of every basin in this grid.
+fn all_basins_sizes(g: Grid) -> Vec<u16> {
     let every_basin = g.all_points().filter_map(|p| basin_of(g.clone(), p));
     let mut c: Counter<Point> = Default::default();
     for basin in every_basin {
         c.add(basin);
     }
-    c.0.into_iter().collect()
+    c.0.into_iter().map(|(_basin, size)| size).collect()
 }
 
 fn solve_q2(g: Grid) -> u32 {
-    let mut basins: Vec<_> = all_basins_sizes(g)
-        .into_iter()
-        .map(|(_basin, num)| num)
-        .collect();
+    let mut basins = all_basins_sizes(g);
     basins.sort_unstable();
     basins.reverse();
     basins.into_iter().take(3).map(|size| size as u32).product()
