@@ -11,7 +11,7 @@ use std::convert::TryInto;
 pub type Pattern = BTreeSet<char>;
 
 fn is_segment(c: char) -> bool {
-    c >= 'a' && c <= 'g'
+    ('a'..='g').contains(&c)
 }
 
 fn to_segs(s: &str) -> Result<Pattern, &'static str> {
