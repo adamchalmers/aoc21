@@ -91,7 +91,8 @@ fn find_low_points(g: &Grid) -> Vec<Point> {
 
 /// Find the neighbour most steeply downhill from this point,
 /// if one exists.
-fn downhill_from(g: &Grid, p: Point) -> Option<Point> {
+#[cached]
+fn downhill_from(g: Grid, p: Point) -> Option<Point> {
     if g.get(p) == 9 {
         return None;
     }
@@ -107,7 +108,7 @@ fn downhill_from(g: &Grid, p: Point) -> Option<Point> {
 /// Find the basin this point is part of.
 #[cached]
 fn basin_of(g: Grid, point: Point) -> Option<Point> {
-    let downhill = match downhill_from(&g, point) {
+    let downhill = match downhill_from(g.clone(), point) {
         Some(p) => p,
         None => return Some(point),
     };
@@ -147,9 +148,9 @@ mod tests {
         let start = Point { x: 0, y: 1 };
         let next = Point { x: 0, y: 0 };
         let end = Point { x: 1, y: 0 };
-        assert_eq!(downhill_from(&g, start), Some(next));
-        assert_eq!(downhill_from(&g, next), Some(end));
-        assert_eq!(downhill_from(&g, end), None);
+        assert_eq!(downhill_from(g.clone(), start), Some(next));
+        assert_eq!(downhill_from(g.clone(), next), Some(end));
+        assert_eq!(downhill_from(g, end), None);
     }
 
     #[test]
