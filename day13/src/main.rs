@@ -4,6 +4,7 @@ fn main() {
     let problem = Problem::parse(include_str!("data/input.txt"));
     let folded_points = problem.folds[0].apply(problem.holes.clone());
     println!("Q1: {}", folded_points.len());
+    println!("Q2:");
     print(&problem.solve());
 }
 
@@ -49,32 +50,26 @@ struct Fold {
 impl Fold {
     /// Does this fold keep the hole unchanged?
     /// False if folding would change this hole's position.
-    fn unchanged(&self, p: &Point) -> bool {
+    fn changes(&self, p: &Point) -> bool {
         match self.dir {
-            Axis::X => p.x < self.val,
-            Axis::Y => p.y < self.val,
+            Axis::X => p.x > self.val,
+            Axis::Y => p.y > self.val,
         }
     }
 
     /// Reflect the point around the fold line.
-    fn reflect(&self, point: Point) -> Point {
+    fn reflect(&self, mut point: Point) -> Point {
         match self.dir {
-            Axis::X => Point {
-                x: 2 * self.val - point.x,
-                ..point
-            },
-            Axis::Y => Point {
-                y: 2 * self.val - point.y,
-                ..point
-            },
+            Axis::X => point.x = 2 * self.val - point.x,
+            Axis::Y => point.y = 2 * self.val - point.y,
         }
+        point
     }
 
     /// Fold the set of holes along this fold.
     fn apply(&self, points: HashSet<Point>) -> HashSet<Point> {
-        let (to_keep, to_change) = points
-            .into_iter()
-            .partition::<HashSet<_>, _>(|p| self.unchanged(p));
+        let (to_change, to_keep): (HashSet<_>, _) =
+            points.into_iter().partition(|p| self.changes(p));
 
         // Keep the points above the fold,
         // Change the points that got folded.
