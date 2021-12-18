@@ -29,6 +29,12 @@ type BitInput<'a> = (&'a [u8], usize);
 /// Takes n bits from the BitInput.
 /// Returns the remaining BitInput and a number from the first n bits.
 fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
+    take(n)(i)
+}
+
+/// Takes n bits from the BitInput.
+/// Returns the remaining BitInput and a number from the first n bits.
+fn take_more_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
     println!(
         "Taking {} bits from input. {} remain",
         n,
@@ -47,6 +53,7 @@ fn parse_header_bits(i: BitInput) -> IResult<BitInput, Header> {
 
 fn parse_packet_bits(i: BitInput) -> IResult<BitInput, Packet> {
     let (i, header) = parse_header_bits(i)?;
+    println!("{:?}, {:?}", i.1, header);
     let (i, body) = match header.type_id {
         4 => parse_literal_number(i)?,
         other => parse_operator(i, other)?,
@@ -89,19 +96,19 @@ impl Packet {
 }
 
 fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
+    println!("Parsing operator");
     let mut subpackets = Vec::new();
     let (j, length_type_id) = take_n_bits(i, 1)?;
     i = j;
     if length_type_id == 0 {
         // the next 15 bits are a number that represents
         // the total length in bits of the sub-packets contained by this packet.
-        let (j, total_subpacket_lengths) = take_n_bits(i, 15)?;
+        let (j, total_subpacket_lengths) = take_more_bits(i, 15)?;
         i = j;
 
-        // The length indicates when to stop parsing packets.
-        let end_offset = i.1 + total_subpacket_lengths as usize;
         // Parse subpackets until the length is reached.
-        while i.1 < end_offset {
+        let initial_bits_left = bits_left(&i);
+        while initial_bits_left - bits_left(&i) < (total_subpacket_lengths as usize) {
             let (j, packet) = parse_packet_bits(i)?;
             i = j;
             subpackets.push(packet);
@@ -109,7 +116,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
     } else {
         // then the next 11 bits are a number that represents
         // the number of sub-packets immediately contained by this packet.
-        let (j, num_subpackets) = take_n_bits(i, 11)?;
+        let (j, num_subpackets) = take_more_bits(i, 11)?;
         i = j;
         for _ in 0..num_subpackets {
             let (j, packet) = parse_packet_bits(i)?;
@@ -125,6 +132,13 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
             type_id,
         },
     ))
+}
+
+fn bits_left(i: &BitInput) -> usize {
+    // How far through the first byte are we?
+    let mut total = 8 - i.1;
+    total += 8 * (i.0.len() - 1);
+    total
 }
 
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
@@ -204,19 +218,67 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_subpackets_total_length() {
+    fn test_parse_operator_total_length() {
         let input = parse_hex("38006F45291200");
         let (_, actual) = Packet::parse(&input).unwrap();
-        assert_eq!(actual.version, 1);
-        if let PacketBody::Operator {
-            type_id,
-            subpackets,
-        } = actual.body
-        {
-            assert_eq!(subpackets.len(), 2);
-            assert_eq!(type_id, 6);
-        } else {
-            panic!("Packet body should be Operator not Literal")
+        let expected = Packet {
+            version: 1,
+            body: PacketBody::Operator {
+                type_id: 6,
+                subpackets: vec![
+                    Packet {
+                        version: 6,
+                        body: PacketBody::Literal(10),
+                    },
+                    Packet {
+                        version: 2,
+                        body: PacketBody::Literal(20),
+                    },
+                ],
+            },
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_operator_num_subpackets() {
+        let input = parse_hex("EE00D40C823060");
+        let (_, actual) = Packet::parse(&input).unwrap();
+        let expected = Packet {
+            version: 7,
+            body: PacketBody::Operator {
+                type_id: 3,
+                subpackets: vec![
+                    Packet {
+                        version: 2,
+                        body: PacketBody::Literal(1),
+                    },
+                    Packet {
+                        version: 4,
+                        body: PacketBody::Literal(2),
+                    },
+                    Packet {
+                        version: 1,
+                        body: PacketBody::Literal(3),
+                    },
+                ],
+            },
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parsing() {
+        let tests = [
+            "8A004A801A8002F478",
+            "620080001611562C8802118E34",
+            "C0015000016115A2E0802F182340",
+            "A0016C880162017C3686B18A3D4780",
+        ];
+        for hex in tests {
+            let input = parse_hex(&hex);
+            let (_, packet) = Packet::parse(&input).unwrap();
+            assert!(matches!(packet.body, PacketBody::Operator { .. }));
         }
     }
 
