@@ -8,6 +8,35 @@ use nom::{
 /// Represents a binary sequence which can be parsed one bit at a time.
 /// Nom represents this as a sequence of bytes, and an offset tracking which number bit
 /// is currently being read.
+///
+/// For example, you might start with 16 bits, pointing at the 0th bit:
+///```
+/// 1111000011001100
+/// ^
+/// ```
+/// Nom represents this using the BitInput type as:
+/// ```
+/// ([0b11110000, 0b11001100], 0)
+///     ^
+/// ```
+/// Lets say you parsed 3 bits from there. After that, the BitInput would be
+///
+/// ```
+/// ([0b11110000, 0b11001100], 3)
+///        ^
+/// ```
+/// After reading another six bits, the input would have advanced past the first byte:
+///
+/// ```
+/// ([0b11110000, 0b11001100], 9)
+///                  ^
+/// ```
+/// Because the first byte will never be used again, Nom optimizes by dropping the first byte
+///
+/// ```
+///  ([0b11001100], 1)
+///       ^
+/// ```
 type BitInput<'a> = (&'a [u8], usize);
 
 /// How many bits can still be parsed from the BitInput.
@@ -38,31 +67,37 @@ struct Header {
     type_id: u8,
 }
 
-fn parse_header_bits(i: BitInput) -> IResult<BitInput, Header> {
-    let (i, version) = take_n_bits(i, 3)?;
-    let (i, type_id) = take_n_bits(i, 3)?;
-    Ok((i, Header { version, type_id }))
-}
-
-fn parse_packet_bits(i: BitInput) -> IResult<BitInput, Packet> {
-    let (i, header) = parse_header_bits(i)?;
-    let (i, body) = match header.type_id {
-        4 => parse_literal_number(i)?,
-        other => parse_operator(i, other)?,
-    };
-    let packet = Packet {
-        version: header.version,
-        body,
-    };
-    Ok((i, packet))
-}
-
-impl Packet {
-    pub fn parse(i: &[u8]) -> IResult<&[u8], Self> {
-        bits(parse_packet_bits)(i)
+impl Header {
+    fn parse(i: BitInput) -> IResult<BitInput, Self> {
+        let (i, version) = take_n_bits(i, 3)?;
+        let (i, type_id) = take_n_bits(i, 3)?;
+        Ok((i, Self { version, type_id }))
     }
 }
 
+impl Packet {
+    /// Parse a Packet from a sequence of bytes.
+    pub fn parse(i: &[u8]) -> IResult<&[u8], Self> {
+        // Convert the byte-offset input into a bit-offset input, then parse that.
+        bits(Self::parse_from_bits)(i)
+    }
+
+    /// Parse a Packet from a sequence of bits.
+    fn parse_from_bits(i: BitInput) -> IResult<BitInput, Self> {
+        let (i, header) = Header::parse(i)?;
+        let (i, body) = match header.type_id {
+            4 => parse_literal_number(i)?,
+            other => parse_operator(i, other)?,
+        };
+        let packet = Packet {
+            version: header.version,
+            body,
+        };
+        Ok((i, packet))
+    }
+}
+
+/// Parse a PacketBody::Operator from a sequence of bits.
 fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
     let mut subpackets = Vec::new();
     let (j, length_type_id) = take_n_bits(i, 1)?;
@@ -76,7 +111,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         // Parse subpackets until the length is reached.
         let initial_bits_remaining = bits_remaining(&i);
         while initial_bits_remaining - bits_remaining(&i) < (total_subpacket_lengths as usize) {
-            let (j, packet) = parse_packet_bits(i)?;
+            let (j, packet) = Packet::parse_from_bits(i)?;
             i = j;
             subpackets.push(packet);
         }
@@ -86,7 +121,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         let (j, num_subpackets) = take_more_bits(i, 11)?;
         i = j;
         for _ in 0..num_subpackets {
-            let (j, packet) = parse_packet_bits(i)?;
+            let (j, packet) = Packet::parse_from_bits(i)?;
             subpackets.push(packet);
             i = j;
         }
@@ -101,6 +136,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
     ))
 }
 
+/// Parse a PacketBody::Literal from a sequence of bits.
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
     let mut half_bytes = Vec::new();
     loop {
@@ -122,14 +158,17 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
     Ok((i, PacketBody::Literal(num)))
 }
 
-/// A nibble is half a byte.
+/// A nibble is a u4 (half a byte). But Rust doesn't have a u4 type!
+/// So we store the u4s in u8s, and then use bit-shifting operations to put them into the right
+/// column of the larger binary number we're working with.
 fn from_nibble((i, nibble): (usize, u8)) -> u64 {
     (nibble as u64) << (4 * i)
 }
 
+/// Every type_id corresponds to a particular operation.
 impl From<u8> for Operation {
-    fn from(value: u8) -> Self {
-        match value {
+    fn from(type_id: u8) -> Self {
+        match type_id {
             0 => Self::Sum,
             1 => Self::Product,
             2 => Self::Min,
