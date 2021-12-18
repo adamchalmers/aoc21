@@ -35,14 +35,7 @@ fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
 /// Takes n bits from the BitInput.
 /// Returns the remaining BitInput and a number from the first n bits.
 fn take_more_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
-    println!(
-        "Taking {} bits from input. {} remain",
-        n,
-        i.0.len() * 8 - i.1
-    );
-    let out = take(n)(i);
-    println!("Took");
-    out
+    take(n)(i)
 }
 
 fn parse_header_bits(i: BitInput) -> IResult<BitInput, Header> {
@@ -53,7 +46,6 @@ fn parse_header_bits(i: BitInput) -> IResult<BitInput, Header> {
 
 fn parse_packet_bits(i: BitInput) -> IResult<BitInput, Packet> {
     let (i, header) = parse_header_bits(i)?;
-    println!("{:?}, {:?}", i.1, header);
     let (i, body) = match header.type_id {
         4 => parse_literal_number(i)?,
         other => parse_operator(i, other)?,
@@ -73,11 +65,39 @@ struct Packet {
 
 #[derive(Eq, PartialEq, Debug)]
 enum PacketBody {
-    Literal(u16),
+    Literal(u64),
     Operator {
-        type_id: u8,
+        type_id: Operation,
         subpackets: Vec<Packet>,
     },
+}
+
+#[derive(Eq, PartialEq, Debug)]
+enum Operation {
+    Sum,
+    Product,
+    Min,
+    Max,
+    Literal,
+    Greater,
+    Less,
+    Equal,
+}
+
+impl From<u8> for Operation {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Sum,
+            1 => Self::Product,
+            2 => Self::Min,
+            3 => Self::Max,
+            4 => Self::Literal,
+            5 => Self::Greater,
+            6 => Self::Less,
+            7 => Self::Equal,
+            other => panic!("illegal type_id {}", other),
+        }
+    }
 }
 
 impl Packet {
@@ -85,18 +105,18 @@ impl Packet {
         bits(parse_packet_bits)(i)
     }
 
-    fn sum_versions(&self) -> u16 {
+    fn sum_versions(&self) -> u64 {
+        let curr = self.version as u64;
         match &self.body {
-            PacketBody::Literal(_) => 0,
+            PacketBody::Literal(_) => curr,
             PacketBody::Operator { subpackets, .. } => {
-                subpackets.iter().map(|p| p.sum_versions()).sum()
+                subpackets.iter().map(|p| p.sum_versions()).sum::<u64>() + curr
             }
         }
     }
 }
 
 fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
-    println!("Parsing operator");
     let mut subpackets = Vec::new();
     let (j, length_type_id) = take_n_bits(i, 1)?;
     i = j;
@@ -129,16 +149,17 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         i,
         PacketBody::Operator {
             subpackets,
-            type_id,
+            type_id: Operation::try_from(type_id).unwrap(),
         },
     ))
 }
 
 fn bits_left(i: &BitInput) -> usize {
     // How far through the first byte are we?
-    let mut total = 8 - i.1;
-    total += 8 * (i.0.len() - 1);
-    total
+    let bits_in_first_byte = 8 - i.1;
+    // And how many bytes are left after that?
+    let remaining_bytes = i.0.len() - 1;
+    bits_in_first_byte + (8 * remaining_bytes)
 }
 
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
@@ -153,7 +174,7 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
         }
     }
     let n = half_bytes.len() - 1;
-    let num: u16 = half_bytes
+    let num: u64 = half_bytes
         .into_iter()
         .enumerate()
         .map(|(i, b)| (n - i, b))
@@ -163,8 +184,8 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
 }
 
 /// A nibble is half a byte.
-fn from_nibble((i, nibble): (usize, u8)) -> u16 {
-    (nibble as u16) << (4 * i)
+fn from_nibble((i, nibble): (usize, u8)) -> u64 {
+    (nibble as u64) << (4 * i)
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -224,7 +245,7 @@ mod tests {
         let expected = Packet {
             version: 1,
             body: PacketBody::Operator {
-                type_id: 6,
+                type_id: Operation::from(6),
                 subpackets: vec![
                     Packet {
                         version: 6,
@@ -247,7 +268,7 @@ mod tests {
         let expected = Packet {
             version: 7,
             body: PacketBody::Operator {
-                type_id: 3,
+                type_id: Operation::from(3),
                 subpackets: vec![
                     Packet {
                         version: 2,
@@ -276,7 +297,7 @@ mod tests {
             "A0016C880162017C3686B18A3D4780",
         ];
         for hex in tests {
-            let input = parse_hex(&hex);
+            let input = parse_hex(hex);
             let (_, packet) = Packet::parse(&input).unwrap();
             assert!(matches!(packet.body, PacketBody::Operator { .. }));
         }
@@ -297,10 +318,14 @@ mod tests {
 
     #[test]
     fn test_sum_versions() {
-        let tests = vec![(EXAMPLE_LITERAL, 0)];
+        let tests = vec![
+            (EXAMPLE_LITERAL, 6),
+            ("EE00D40C823060", 14),
+            ("38006F45291200", 9),
+        ];
         for (hex, expected) in tests {
             let (_, packets) = Packet::parse(&parse_hex(hex)).unwrap();
-            assert_eq!(packets.sum_versions(), expected);
+            assert_eq!(packets.sum_versions(), expected, "Failed {}", hex);
         }
     }
 }
