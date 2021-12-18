@@ -4,7 +4,9 @@ use nom::{
 };
 
 fn main() {
-    println!("Hello, world!");
+    let input = parse_hex(include_str!("data/input.txt"));
+    let (_rem, packets) = Packet::parse(&input).unwrap();
+    println!("Q1: {}", packets.sum_versions());
 }
 
 /// Parse an even-length string of hex into bytes.
@@ -24,9 +26,17 @@ fn parse_hex(s: &str) -> Vec<u8> {
 /// Bitwise input for Nom parsers.
 type BitInput<'a> = (&'a [u8], usize);
 
-/// Takes 3 bits from the BitInput, returns the remaining BitInput and a number from the first 3 bits.
-fn take_n_bits(i: BitInput, n: usize) -> IResult<BitInput, u8> {
-    take(n)(i)
+/// Takes n bits from the BitInput.
+/// Returns the remaining BitInput and a number from the first n bits.
+fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
+    println!(
+        "Taking {} bits from input. {} remain",
+        n,
+        i.0.len() * 8 - i.1
+    );
+    let out = take(n)(i);
+    println!("Took");
+    out
 }
 
 fn parse_header_bits(i: BitInput) -> IResult<BitInput, Header> {
@@ -39,17 +49,13 @@ fn parse_packet_bits(i: BitInput) -> IResult<BitInput, Packet> {
     let (i, header) = parse_header_bits(i)?;
     let (i, body) = match header.type_id {
         4 => parse_literal_number(i)?,
-        _ => unreachable!(),
+        other => parse_operator(i, other)?,
     };
     let packet = Packet {
         version: header.version,
         body,
     };
     Ok((i, packet))
-}
-
-fn parse_packet_bytes(i: &[u8]) -> IResult<&[u8], Packet> {
-    bits(parse_packet_bits)(i)
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -61,6 +67,64 @@ struct Packet {
 #[derive(Eq, PartialEq, Debug)]
 enum PacketBody {
     Literal(u16),
+    Operator {
+        type_id: u8,
+        subpackets: Vec<Packet>,
+    },
+}
+
+impl Packet {
+    fn parse(i: &[u8]) -> IResult<&[u8], Self> {
+        bits(parse_packet_bits)(i)
+    }
+
+    fn sum_versions(&self) -> u16 {
+        match &self.body {
+            PacketBody::Literal(_) => 0,
+            PacketBody::Operator { subpackets, .. } => {
+                subpackets.iter().map(|p| p.sum_versions()).sum()
+            }
+        }
+    }
+}
+
+fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
+    let mut subpackets = Vec::new();
+    let (j, length_type_id) = take_n_bits(i, 1)?;
+    i = j;
+    if length_type_id == 0 {
+        // the next 15 bits are a number that represents
+        // the total length in bits of the sub-packets contained by this packet.
+        let (j, total_subpacket_lengths) = take_n_bits(i, 15)?;
+        i = j;
+
+        // The length indicates when to stop parsing packets.
+        let end_offset = i.1 + total_subpacket_lengths as usize;
+        // Parse subpackets until the length is reached.
+        while i.1 < end_offset {
+            let (j, packet) = parse_packet_bits(i)?;
+            i = j;
+            subpackets.push(packet);
+        }
+    } else {
+        // then the next 11 bits are a number that represents
+        // the number of sub-packets immediately contained by this packet.
+        let (j, num_subpackets) = take_n_bits(i, 11)?;
+        i = j;
+        for _ in 0..num_subpackets {
+            let (j, packet) = parse_packet_bits(i)?;
+            subpackets.push(packet);
+            i = j;
+        }
+    }
+
+    Ok((
+        i,
+        PacketBody::Operator {
+            subpackets,
+            type_id,
+        },
+    ))
 }
 
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
@@ -86,7 +150,6 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
 
 /// A nibble is half a byte.
 fn from_nibble((i, nibble): (usize, u8)) -> u16 {
-    println!("Nibble #{} is {:b}", i, nibble);
     (nibble as u16) << (4 * i)
 }
 
@@ -111,12 +174,50 @@ mod tests {
     #[test]
     fn test_parse_literal() {
         let input = parse_hex(EXAMPLE_LITERAL);
-        let (_rem, actual) = parse_packet_bytes(&input).unwrap();
+        let (_rem, actual) = Packet::parse(&input).unwrap();
         let expected = Packet {
             version: 6,
             body: PacketBody::Literal(2021),
         };
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_literal2() {
+        let input = [0b11010001, 0b01000000];
+        let (_, actual) = Packet::parse(&input).unwrap();
+        let expected = Packet {
+            version: 6,
+            body: PacketBody::Literal(10),
+        };
+        assert_eq!(actual, expected);
+    }
+    #[test]
+    fn test_parse_literal3() {
+        let input = [0b01010010, 0b00100100];
+        let (_, actual) = Packet::parse(&input).unwrap();
+        let expected = Packet {
+            version: 2,
+            body: PacketBody::Literal(20),
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_subpackets_total_length() {
+        let input = parse_hex("38006F45291200");
+        let (_, actual) = Packet::parse(&input).unwrap();
+        assert_eq!(actual.version, 1);
+        if let PacketBody::Operator {
+            type_id,
+            subpackets,
+        } = actual.body
+        {
+            assert_eq!(subpackets.len(), 2);
+            assert_eq!(type_id, 6);
+        } else {
+            panic!("Packet body should be Operator not Literal")
+        }
     }
 
     #[test]
@@ -130,10 +231,14 @@ mod tests {
             let actual = from_nibble((i, input_nibble));
             assert_eq!(actual, expected, "{}", input_nibble);
         }
-        assert_eq!(1024 + 512 + 256 + 128 + 64 + 32 + 5, 2021);
+    }
+
+    #[test]
+    fn test_sum_versions() {
+        let tests = vec![(EXAMPLE_LITERAL, 0)];
+        for (hex, expected) in tests {
+            let (_, packets) = Packet::parse(&parse_hex(hex)).unwrap();
+            assert_eq!(packets.sum_versions(), expected);
+        }
     }
 }
-
-// (0111)
-// (1110)
-// (0101)
