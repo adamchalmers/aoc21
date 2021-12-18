@@ -4,21 +4,34 @@ use nom::{
     IResult,
 };
 
-/// Bitwise input for Nom parsers.
+/// Newtype around a very common type in Nom.
+/// Represents a binary sequence which can be parsed one bit at a time.
+/// Nom represents this as a sequence of bytes, and an offset tracking which number bit
+/// is currently being read.
 type BitInput<'a> = (&'a [u8], usize);
 
+/// How many bits can still be parsed from the BitInput.
+fn bits_remaining(i: &BitInput) -> usize {
+    // How far through the first byte are we?
+    let bits_in_first_byte = 8 - i.1;
+    // And how many bytes are left after that?
+    let remaining_bytes = i.0.len() - 1;
+    bits_in_first_byte + (8 * remaining_bytes)
+}
+
 /// Takes n bits from the BitInput.
-/// Returns the remaining BitInput and a number from the first n bits.
+/// Returns the remaining BitInput and a number parsed the first n bits.
 fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
     take(n)(i)
 }
 
 /// Takes n bits from the BitInput.
-/// Returns the remaining BitInput and a number from the first n bits.
+/// Returns the remaining BitInput and a number parsed the first n bits.
 fn take_more_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
     take(n)(i)
 }
 
+/// Every packet has a header.
 #[derive(Eq, PartialEq, Debug)]
 struct Header {
     version: u8,
@@ -61,8 +74,8 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         i = j;
 
         // Parse subpackets until the length is reached.
-        let initial_bits_left = bits_left(&i);
-        while initial_bits_left - bits_left(&i) < (total_subpacket_lengths as usize) {
+        let initial_bits_remaining = bits_remaining(&i);
+        while initial_bits_remaining - bits_remaining(&i) < (total_subpacket_lengths as usize) {
             let (j, packet) = parse_packet_bits(i)?;
             i = j;
             subpackets.push(packet);
@@ -83,17 +96,9 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         i,
         PacketBody::Operator {
             subpackets,
-            type_id: Operation::try_from(type_id).unwrap(),
+            type_id: Operation::from(type_id),
         },
     ))
-}
-
-fn bits_left(i: &BitInput) -> usize {
-    // How far through the first byte are we?
-    let bits_in_first_byte = 8 - i.1;
-    // And how many bytes are left after that?
-    let remaining_bytes = i.0.len() - 1;
-    bits_in_first_byte + (8 * remaining_bytes)
 }
 
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
@@ -129,7 +134,7 @@ impl From<u8> for Operation {
             1 => Self::Product,
             2 => Self::Min,
             3 => Self::Max,
-            4 => Self::Literal,
+            4 => panic!("Literals should not be parsed into Operations"),
             5 => Self::Greater,
             6 => Self::Less,
             7 => Self::Equal,
