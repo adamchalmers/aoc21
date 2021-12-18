@@ -1,8 +1,5 @@
 use nom::{
-    bits::{
-        bits,
-        complete::{tag, take},
-    },
+    bits::{bits, complete::take},
     IResult,
 };
 
@@ -66,10 +63,6 @@ enum PacketBody {
     Literal(u16),
 }
 
-fn parse_header_bytes(i: &[u8]) -> IResult<&[u8], Header> {
-    bits(parse_header_bits)(i)
-}
-
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
     let mut half_bytes = Vec::new();
     loop {
@@ -116,19 +109,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_header() {
-        let input = vec![0b11010010, 0b11111110, 0b00101000];
-        let (_rem, actual) = parse_header_bytes(&input).unwrap();
-        let expected = Header {
-            version: 6,
-            type_id: 4,
-        };
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
     fn test_parse_literal() {
-        let input = vec![0b11010010, 0b11111110, 0b00101000];
+        let input = parse_hex(EXAMPLE_LITERAL);
         let (_rem, actual) = parse_packet_bytes(&input).unwrap();
         let expected = Packet {
             version: 6,
