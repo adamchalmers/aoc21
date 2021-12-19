@@ -1,9 +1,9 @@
-mod pair;
 mod parse;
+mod sailfish_number;
 
-use pair::Pair;
+use sailfish_number::Number;
 
 fn main() {
     let _homework =
-        Pair::parse_many(include_str!("data/input.txt")).expect("could not parse input file");
+        Number::parse_many(include_str!("data/input.txt")).expect("could not parse input file");
 }

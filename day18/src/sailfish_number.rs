@@ -1,9 +1,9 @@
-pub struct Pair {
+pub struct Number {
     pub l: Element,
     pub r: Element,
 }
 
 pub enum Element {
-    Num(u8),
-    Pair(Box<Pair>),
+    Literal(u8),
+    Pair(Box<Number>),
 }

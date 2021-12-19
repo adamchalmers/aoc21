@@ -1,4 +1,4 @@
-use crate::pair::{Element, Pair};
+use crate::sailfish_number::{Element, Number};
 use nom::{
     branch::alt,
     bytes::complete::take_while_m_n,
@@ -10,7 +10,7 @@ use nom::{
     IResult,
 };
 
-impl Pair {
+impl Number {
     /// Nom parser. Parses a Sailfish number pair.
     pub fn parse(input: &str) -> IResult<&str, Self> {
         let parser = tuple((
@@ -33,12 +33,12 @@ impl Pair {
 impl Element {
     /// Nom parser. Parses Element::Num case.
     fn parse_num(input: &str) -> IResult<&str, Self> {
-        map(parse_one_digit, Element::Num)(input)
+        map(parse_one_digit, Element::Literal)(input)
     }
 
     /// Nom parser. Parses Element::Pair case.
     fn parse_pair(input: &str) -> IResult<&str, Self> {
-        map(Pair::parse, |p| Element::Pair(Box::new(p)))(input)
+        map(Number::parse, |p| Element::Pair(Box::new(p)))(input)
     }
 
     /// Nom parser. Parses either case of Element.
@@ -77,7 +77,7 @@ mod tests {
             ),
         ];
         for (input_str, should_parse) in tests {
-            assert_eq!(Pair::parse(input_str).is_ok(), should_parse);
+            assert_eq!(Number::parse(input_str).is_ok(), should_parse);
         }
     }
 }
