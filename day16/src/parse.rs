@@ -40,7 +40,7 @@ use nom::{
 type BitInput<'a> = (&'a [u8], usize);
 
 /// How many bits can still be parsed from the BitInput.
-fn bits_remaining(i: &BitInput) -> usize {
+fn bits_remaining(i: BitInput) -> usize {
     // How far through the first byte are we?
     let bits_in_first_byte = 8 - i.1;
     // And how many bytes are left after that?
@@ -109,8 +109,8 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         i = j;
 
         // Parse subpackets until the length is reached.
-        let initial_bits_remaining = bits_remaining(&i);
-        while initial_bits_remaining - bits_remaining(&i) < (total_subpacket_lengths as usize) {
+        let initial_bits_remaining = bits_remaining(i);
+        while initial_bits_remaining - bits_remaining(i) < (total_subpacket_lengths as usize) {
             let (j, packet) = Packet::parse_from_bits(i)?;
             i = j;
             subpackets.push(packet);
