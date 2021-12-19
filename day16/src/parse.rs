@@ -54,9 +54,9 @@ fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
     take(n)(i)
 }
 
-/// Takes n bits from the BitInput.
+/// Takes n pairs of bits from the BitInput.
 /// Returns the remaining BitInput and a number parsed the first n bits.
-fn take_more_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
+fn take_n_pairs(i: BitInput, n: u8) -> IResult<BitInput, u16> {
     take(n)(i)
 }
 
@@ -105,7 +105,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
     if length_type_id == 0 {
         // the next 15 bits are a number that represents
         // the total length in bits of the sub-packets contained by this packet.
-        let (j, total_subpacket_lengths) = take_more_bits(i, 15)?;
+        let (j, total_subpacket_lengths) = take_n_pairs(i, 15)?;
         i = j;
 
         // Parse subpackets until the length is reached.
@@ -118,7 +118,7 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
     } else {
         // then the next 11 bits are a number that represents
         // the number of sub-packets immediately contained by this packet.
-        let (j, num_subpackets) = take_more_bits(i, 11)?;
+        let (j, num_subpackets) = take_n_pairs(i, 11)?;
         i = j;
         for _ in 0..num_subpackets {
             let (j, packet) = Packet::parse_from_bits(i)?;
