@@ -1,4 +1,4 @@
-use crate::sailfish_number::{Element, Number};
+use crate::sailfish_number::Number;
 use nom::{
     branch::alt,
     bytes::complete::take_while_m_n,
@@ -12,38 +12,34 @@ use nom::{
 
 impl Number {
     /// Nom parser. Parses a Sailfish number pair.
-    pub fn parse(input: &str) -> IResult<&str, Self> {
+    fn parse_node(input: &str) -> IResult<&str, Self> {
         let parser = tuple((
             char('['),
-            Element::parse,
+            Number::parse,
             char(','),
-            Element::parse,
+            Number::parse,
             char(']'),
         ));
-        let mut discard_delimiter_parser = map(parser, |(_, l, _, r, _)| Self { l, r });
+        let mut discard_delimiter_parser = map(parser, |(_, l, _, r, _)| Self::Node {
+            l: Box::new(l),
+            r: Box::new(r),
+        });
         discard_delimiter_parser(input)
+    }
+
+    /// Nom parser. Parses Number::Leaf case.
+    fn parse_leaf(input: &str) -> IResult<&str, Self> {
+        map(parse_one_digit, Number::Leaf)(input)
+    }
+
+    /// Nom parser. Parses either Leaf or Node.
+    pub fn parse(input: &str) -> IResult<&str, Self> {
+        alt((Self::parse_node, Self::parse_leaf))(input)
     }
 
     /// Nom parser. Parses a newline-separated list of Sailfish number pairs.
     pub fn parse_many(input: &str) -> IResult<&str, Vec<Self>> {
         separated_list0(newline, Self::parse)(input)
-    }
-}
-
-impl Element {
-    /// Nom parser. Parses Element::Num case.
-    fn parse_num(input: &str) -> IResult<&str, Self> {
-        map(parse_one_digit, Element::Literal)(input)
-    }
-
-    /// Nom parser. Parses Element::Pair case.
-    fn parse_pair(input: &str) -> IResult<&str, Self> {
-        map(Number::parse, |p| Element::Pair(Box::new(p)))(input)
-    }
-
-    /// Nom parser. Parses either case of Element.
-    pub fn parse(input: &str) -> IResult<&str, Self> {
-        alt((Self::parse_num, Self::parse_pair))(input)
     }
 }
 
