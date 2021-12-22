@@ -1,4 +1,4 @@
-use crate::sailfish_number::Number;
+use crate::sailfish_number::Tree;
 use nom::{
     branch::alt,
     bytes::complete::take_while_m_n,
@@ -10,16 +10,10 @@ use nom::{
     IResult,
 };
 
-impl Number {
+impl Tree {
     /// Nom parser. Parses a Sailfish number pair.
     fn parse_node(input: &str) -> IResult<&str, Self> {
-        let parser = tuple((
-            char('['),
-            Number::parse,
-            char(','),
-            Number::parse,
-            char(']'),
-        ));
+        let parser = tuple((char('['), Tree::parse, char(','), Tree::parse, char(']')));
         let mut discard_delimiter_parser = map(parser, |(_, l, _, r, _)| Self::Node {
             l: Box::new(l),
             r: Box::new(r),
@@ -27,9 +21,9 @@ impl Number {
         discard_delimiter_parser(input)
     }
 
-    /// Nom parser. Parses Number::Leaf case.
+    /// Nom parser. Parses Tree::Leaf case.
     fn parse_leaf(input: &str) -> IResult<&str, Self> {
-        map(parse_one_digit, Number::Leaf)(input)
+        map(parse_one_digit, Tree::Leaf)(input)
     }
 
     /// Nom parser. Parses either Leaf or Node.
@@ -73,7 +67,7 @@ mod tests {
             ),
         ];
         for (input_str, should_parse) in tests {
-            assert_eq!(Number::parse(input_str).is_ok(), should_parse);
+            assert_eq!(Tree::parse(input_str).is_ok(), should_parse);
         }
     }
 }
