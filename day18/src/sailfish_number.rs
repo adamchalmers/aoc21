@@ -17,15 +17,27 @@ impl std::ops::Add for Number {
     }
 }
 
+impl std::fmt::Display for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Leaf(n) => n.to_string(),
+            Self::Node { l, r } => format!("[{},{}]", l.to_string(), r.to_string()),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl Number {
-    /// Returns true if a reduction was applied.
-    /// If any pair is nested inside four pairs, the leftmost such pair explodes
-    /// To explode a pair, the pair's left value is added to the first regular number to the left of
-    /// the exploding pair (if any), and the pair's right value is added to the first regular number
-    /// to the right of the exploding pair (if any). Exploding pairs will always consist of two
-    /// regular numbers. Then, the entire exploding pair is replaced with the regular number 0.
-    fn apply_explode(&mut self, depth: u8) -> bool {
-        false
+    /// An inorder traversal yields leaves in the same left-to-right order they appear in the text representation.
+    fn inorder(&self) -> Vec<u8> {
+        match self {
+            Self::Leaf(num) => vec![*num],
+            Self::Node { l, r } => {
+                let mut leaves = l.inorder();
+                leaves.extend(r.inorder());
+                leaves
+            }
+        }
     }
 }
 
@@ -34,16 +46,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_explode() {
+    fn parsing_and_printing_are_inverses() {
+        let inputs = vec!["[[1,2],3]", "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]"];
+        for input in inputs {
+            let (_, parsed) = Number::parse(input).unwrap();
+            assert_eq!(parsed.to_string(), input);
+        }
+    }
+
+    #[test]
+    fn test_inorder() {
         let tests = [
-            // the 9 has no regular number to its left, so it is not added to any regular number
-            // ("[[[[[9,8],1],2],3],4]", "[[[[0,9],2],3],4]"),
+            ("[1,2]", vec![1, 2]),
+            ("[[1,2],3]", vec![1, 2, 3]),
+            ("[[6,[5,[4,[3,2]]]],1]", vec![6, 5, 4, 3, 2, 1]),
         ];
-        for (str_in, str_out) in tests {
-            let mut num = Number::parse(str_in).unwrap().1;
-            let expected_out = Number::parse(str_out).unwrap().1;
-            assert!(num.apply_explode(0));
-            assert_eq!(num, expected_out)
+        for (input, expected) in tests {
+            let (_, parsed) = Number::parse(input).unwrap();
+            assert_eq!(parsed.inorder(), expected);
         }
     }
 }
