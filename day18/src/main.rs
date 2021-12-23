@@ -1,4 +1,5 @@
 mod parse;
+mod reduction;
 mod sailfish_number;
 
 use sailfish_number::Tree;

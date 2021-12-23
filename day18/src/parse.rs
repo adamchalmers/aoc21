@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::sailfish_number::Tree;
 use nom::{
     branch::alt,
@@ -27,13 +29,22 @@ impl Tree {
     }
 
     /// Nom parser. Parses either Leaf or Node.
-    pub fn parse(input: &str) -> IResult<&str, Self> {
+    fn parse(input: &str) -> IResult<&str, Self> {
         alt((Self::parse_node, Self::parse_leaf))(input)
     }
 
     /// Nom parser. Parses a newline-separated list of Sailfish number pairs.
     pub fn parse_many(input: &str) -> IResult<&str, Vec<Self>> {
         separated_list0(newline, Self::parse)(input)
+    }
+}
+
+impl FromStr for Tree {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (_, val) = Self::parse(s).map_err(|e| e.to_string())?;
+        Ok(val)
     }
 }
 
