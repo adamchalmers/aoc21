@@ -89,33 +89,33 @@ pub struct TokenStream {
     pub tokens: Vec<Token>,
 }
 
+impl TokenStream {
+    fn parse(i: &str) -> nom::IResult<&str, Self> {
+        use nom::{
+            branch::alt, bytes::complete::take_while, character::complete::char, combinator::map,
+            combinator::map_res,
+        };
+
+        let p_open = map(char('['), |_| Token::Open);
+        let p_close = map(char(']'), |_| Token::Close);
+        let p_comma = map(char(','), |_| Token::Comma);
+        pub fn p_num(input: &str) -> IResult<&str, Token> {
+            let parse_digits = take_while(|c: char| c.is_digit(10));
+            let parse_u8 = map_res(parse_digits, u8::from_str);
+            map(parse_u8, Token::Num)(input)
+        }
+        let p_token = alt((p_open, p_close, p_num, p_comma));
+
+        map(many1(p_token), |tokens| TokenStream { tokens })(i)
+    }
+}
+
 impl FromStr for TokenStream {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn parse(i: &str) -> nom::IResult<&str, Vec<Token>> {
-            use nom::{
-                branch::alt, bytes::complete::take_while, character::complete::char,
-                combinator::map, combinator::map_res,
-            };
-
-            let p_open = map(char('['), |_| Token::Open);
-            let p_close = map(char(']'), |_| Token::Close);
-            let p_comma = map(char(','), |_| Token::Comma);
-
-            pub fn p_num(input: &str) -> IResult<&str, Token> {
-                let parse_digits = take_while(|c: char| c.is_digit(10));
-                let parse_u8 = map_res(parse_digits, u8::from_str);
-                map(parse_u8, Token::Num)(input)
-            }
-
-            let p = alt((p_open, p_close, p_num, p_comma));
-            let mut p = many1(p);
-            p(i)
-        }
-        parse(s)
-            .map(|(_, tokens)| TokenStream { tokens })
-            .map_err(|e| e.to_string())
+        let t = Self::parse(s).map_err(|e| e.to_string())?;
+        Ok(t.1)
     }
 }
 

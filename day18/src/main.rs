@@ -6,7 +6,8 @@ use sailfish_number::Tree;
 
 fn main() {
     let sum = homework_q1(include_str!("data/input.txt"));
-    println!("{}", sum.magnitude())
+    println!("Q1: {}", sum.magnitude());
+    println!("Q2: {}", homework_q2(include_str!("data/input.txt")));
 }
 
 fn homework_q1(s: &str) -> Tree {
@@ -15,6 +16,19 @@ fn homework_q1(s: &str) -> Tree {
         .1
         .into_iter()
         .reduce(|sum, item| sum + item)
+        .unwrap()
+}
+
+fn homework_q2(s: &str) -> u16 {
+    let nums = Tree::parse_many(s).expect("could not parse input file").1;
+    nums.iter()
+        .flat_map(|num0| {
+            nums.iter().map(|num1| {
+                let t = num0.clone() + num1.clone();
+                t.magnitude()
+            })
+        })
+        .max()
         .unwrap()
 }
 
