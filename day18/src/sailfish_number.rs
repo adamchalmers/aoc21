@@ -1,6 +1,6 @@
-use std::{num::ParseIntError, str::FromStr};
-
+use crate::reduction::reduce;
 use nom::{multi::many1, IResult};
+use std::str::FromStr;
 
 /// A hierarchical representation of sailfish numbers.
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -15,10 +15,13 @@ impl std::ops::Add for Tree {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Tree::Node {
+        let tree = Tree::Node {
             l: Box::new(self),
             r: Box::new(rhs),
-        }
+        };
+        let ts = TokenStream::try_from(tree).unwrap();
+        let ts = reduce(ts);
+        Tree::from_str(&ts.to_string()).unwrap()
     }
 }
 
@@ -33,15 +36,12 @@ impl std::fmt::Display for Tree {
 }
 
 impl Tree {
-    /// An inorder traversal yields leaves in the same left-to-right order they appear in the text representation.
-    fn inorder(&self) -> Vec<u8> {
+    pub fn magnitude(&self) -> u16 {
         match self {
-            Self::Leaf(num) => vec![*num],
-            Self::Node { l, r } => {
-                let mut leaves = l.inorder();
-                leaves.extend(r.inorder());
-                leaves
-            }
+            Tree::Leaf(n) => *n as u16,
+            // The magnitude of a pair is 3 times the magnitude of its left element
+            // plus 2 times the magnitude of its right element.
+            Tree::Node { l, r } => 3 * l.magnitude() + 2 * r.magnitude(),
         }
     }
 }
@@ -104,11 +104,9 @@ impl FromStr for TokenStream {
             let p_comma = map(char(','), |_| Token::Comma);
 
             pub fn p_num(input: &str) -> IResult<&str, Token> {
-                let parse_u8 = map_res(take_while(|c: char| c.is_digit(10)), |input| {
-                    u8::from_str(input)
-                });
-                let mut p = map(parse_u8, |n| Token::Num(n));
-                p(input)
+                let parse_digits = take_while(|c: char| c.is_digit(10));
+                let parse_u8 = map_res(parse_digits, u8::from_str);
+                map(parse_u8, Token::Num)(input)
             }
 
             let p = alt((p_open, p_close, p_num, p_comma));
@@ -147,15 +145,21 @@ mod tests {
     }
 
     #[test]
-    fn test_inorder() {
+    fn magnitudes() {
         let tests = [
-            ("[1,2]", vec![1, 2]),
-            ("[[1,2],3]", vec![1, 2, 3]),
-            ("[[6,[5,[4,[3,2]]]],1]", vec![6, 5, 4, 3, 2, 1]),
+            ("[[1,2],[[3,4],5]]", 143),
+            ("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]", 1384),
+            ("[[[[1,1],[2,2]],[3,3]],[4,4]]", 445),
+            ("[[[[3,0],[5,3]],[4,4]],[5,5]]", 791),
+            ("[[[[5,0],[7,4]],[5,5]],[6,6]]", 1137),
+            (
+                "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]",
+                3488,
+            ),
         ];
-        for (input, expected) in tests {
-            let parsed = Tree::from_str(input).unwrap();
-            assert_eq!(parsed.inorder(), expected);
+        for (input, expected_magnitude) in tests {
+            let actual_magnitude = Tree::from_str(input).unwrap().magnitude();
+            assert_eq!(actual_magnitude, expected_magnitude, "case {}", input);
         }
     }
 }

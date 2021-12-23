@@ -3,7 +3,7 @@ use crate::sailfish_number::*;
 pub fn reduce(ts: TokenStream) -> TokenStream {
     let mut curr = ts;
     loop {
-        println!("{}", curr);
+        // println!("{}", curr);
         let exploded = apply_explode(&curr);
         if exploded != curr {
             curr = exploded;
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_apply_split() {
         let input_str = "[[[[0,7],4],[15,[0,13]]],[1,1]]";
-        let input = TokenStream::from_str(&input_str).unwrap();
+        let input = TokenStream::from_str(input_str).unwrap();
         let expected = TokenStream::from_str("[[[[0,7],4],[[7,8],[0,13]]],[1,1]]").unwrap();
         let actual = apply_split(&input);
         assert_eq!(

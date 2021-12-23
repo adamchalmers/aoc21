@@ -50,7 +50,7 @@ impl FromStr for Tree {
 
 /// Nom parser. Parses exactly one decimal digit.
 fn parse_one_digit(input: &str) -> IResult<&str, u8> {
-    let str_to_digit = |input| u8::from_str_radix(input, 10);
+    let str_to_digit = |input: &str| input.parse::<u8>();
 
     fn is_digit(c: char) -> bool {
         c.is_digit(10)
