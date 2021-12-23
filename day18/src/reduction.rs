@@ -19,26 +19,35 @@ pub fn reduce(ts: TokenStream) -> TokenStream {
 }
 
 fn apply_split(ts: &TokenStream) -> TokenStream {
-    let mut new_tokens = Vec::new();
-    let mut split_done = false;
-    for token in &ts.tokens {
-        match token {
-            Token::Num(n) if n >= &10 && !split_done => {
-                let (l, r) = split(*n);
-                new_tokens.push(Token::Open);
-                // the left element of the pair should be the regular number divided by two
-                // and rounded down
-                new_tokens.push(Token::Num(l));
-                new_tokens.push(Token::Comma);
-                // the right element of the pair should be the regular number divided by two
-                // and rounded up.
-                new_tokens.push(Token::Num(r));
-                new_tokens.push(Token::Close);
-                split_done = true;
-            }
-            other => new_tokens.push(*other),
-        }
-    }
+    let new_tokens = ts
+        .tokens
+        .iter()
+        .fold(
+            (Vec::new(), false),
+            |(mut new_tokens, mut split_done), token| {
+                match token {
+                    Token::Num(n) if n >= &10 && !split_done => {
+                        let (l, r) = split(*n);
+                        new_tokens.extend([
+                            Token::Open,
+                            // the left element of the pair should be the regular number divided by two
+                            // and rounded down
+                            Token::Num(l),
+                            Token::Comma,
+                            // the right element of the pair should be the regular number divided by two
+                            // and rounded up.
+                            Token::Num(r),
+                            Token::Close,
+                        ]);
+                        split_done = true;
+                    }
+                    other => new_tokens.push(*other),
+                }
+                (new_tokens, split_done)
+            },
+        )
+        .0;
+
     TokenStream { tokens: new_tokens }
 }
 
@@ -76,7 +85,7 @@ fn apply_explode(ts: &TokenStream) -> TokenStream {
             t @ Token::Num(n) => {
                 match explode {
                     Explode::None => {
-                        if depth >= 5 && ts.tokens[i + 1] == Token::Comma {
+                        if depth > 4 && ts.tokens[i + 1] == Token::Comma {
                             if let Token::Num(n_right) = &ts.tokens[i + 2] {
                                 explode = Explode::Carry(*n_right);
                                 // Go backwards through the new tokens until you find a number
