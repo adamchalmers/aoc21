@@ -1,8 +1,11 @@
-mod parse;
 mod reduction;
 mod sailfish_number;
+mod tokenstream;
+mod tree;
 
-use sailfish_number::Tree;
+use std::str::FromStr;
+
+use tokenstream::TokenStream;
 
 fn main() {
     let sum = homework_q1(include_str!("data/input.txt"));
@@ -10,23 +13,22 @@ fn main() {
     println!("Q2: {}", homework_q2(include_str!("data/input.txt")));
 }
 
-fn homework_q1(s: &str) -> Tree {
-    Tree::parse_many(s)
-        .expect("could not parse input file")
-        .1
-        .into_iter()
+fn homework_q1(s: &str) -> TokenStream {
+    s.lines()
+        .map(|l| TokenStream::from_str(l).unwrap())
         .reduce(|sum, item| sum + item)
         .unwrap()
 }
 
 fn homework_q2(s: &str) -> u16 {
-    let nums = Tree::parse_many(s).expect("could not parse input file").1;
+    let nums: Vec<_> = s
+        .lines()
+        .map(|l| TokenStream::from_str(l).unwrap())
+        .collect();
     nums.iter()
         .flat_map(|num0| {
-            nums.iter().map(|num1| {
-                let t = num0.clone() + num1.clone();
-                t.magnitude()
-            })
+            nums.iter()
+                .map(|num1| (num0.to_owned() + num1.to_owned()).magnitude())
         })
         .max()
         .unwrap()

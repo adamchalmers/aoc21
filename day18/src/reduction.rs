@@ -1,9 +1,8 @@
-use crate::sailfish_number::*;
+use crate::tokenstream::*;
 
 pub fn reduce(ts: TokenStream) -> TokenStream {
     let mut curr = ts;
     loop {
-        // println!("{}", curr);
         let exploded = apply_explode(&curr);
         if exploded != curr {
             curr = exploded;
@@ -49,13 +48,13 @@ fn split(n: u8) -> (u8, u8) {
     (l, r)
 }
 
-enum Explode {
-    None,
-    Carry(u8),
-    Done,
-}
-
 fn apply_explode(ts: &TokenStream) -> TokenStream {
+    enum Explode {
+        None,
+        Carry(u8),
+        Done,
+    }
+
     let mut new_tokens = Vec::new();
     let mut explode = Explode::None;
     let mut depth = 0u16;
