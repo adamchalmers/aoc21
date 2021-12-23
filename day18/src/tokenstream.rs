@@ -1,12 +1,12 @@
+//! I need a linear representation of Snailfish numbers for applying reductions.
 use crate::reduction::reduce;
 use crate::tree::Tree;
 use nom::{multi::many1, IResult};
 use std::str::FromStr;
 
+/// A linear representation of snailfish numbers.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct TokenStream {
-    pub tokens: Vec<Token>,
-}
+pub struct TokenStream(pub Vec<Token>);
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Token {
@@ -23,8 +23,7 @@ impl std::ops::Add for TokenStream {
 
     fn add(self, rhs: Self) -> Self::Output {
         let s = ["[", &self.to_string(), ",", &rhs.to_string(), "]"].join("");
-        let ts = TokenStream::from_str(&s).unwrap();
-        reduce(ts)
+        reduce(TokenStream::from_str(&s).unwrap())
     }
 }
 
@@ -45,11 +44,11 @@ impl TokenStream {
         }
         let p_token = alt((p_open, p_close, p_num, p_comma));
 
-        map(many1(p_token), |tokens| TokenStream { tokens })(input)
+        map(many1(p_token), TokenStream)(input)
     }
 
-    pub fn magnitude(&self) -> u16 {
-        Tree::try_from(self.to_owned()).unwrap().magnitude()
+    pub fn magnitude(self) -> u16 {
+        Tree::from(self).magnitude()
     }
 }
 
@@ -64,14 +63,8 @@ impl FromStr for TokenStream {
 
 impl std::fmt::Display for TokenStream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: String = self.tokens.iter().map(|token| token.to_string()).collect();
+        let s: String = self.0.iter().map(|token| token.to_string()).collect();
         write!(f, "{}", s)
-    }
-}
-
-impl From<Tree> for TokenStream {
-    fn from(tree: Tree) -> Self {
-        TokenStream::from_str(&tree.to_string()).unwrap()
     }
 }
 

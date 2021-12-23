@@ -1,3 +1,4 @@
+//! I need a hierarchical representation of Snailfish numbers for calculating magnitudes.
 use crate::tokenstream::*;
 use nom::{
     branch::alt, bytes::complete::take_while_m_n, character::complete::char, combinator::map,
@@ -5,7 +6,7 @@ use nom::{
 };
 use std::str::FromStr;
 
-/// A hierarchical representation of sailfish numbers.
+/// A hierarchical representation of snailfish numbers.
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum Tree {
     Leaf(u8),
@@ -30,7 +31,12 @@ impl From<TokenStream> for Tree {
 }
 
 impl Tree {
-    /// Nom parser. Parses a Sailfish number pair.
+    /// Nom parser.
+    fn parse(input: &str) -> IResult<&str, Self> {
+        alt((Self::parse_node, Self::parse_leaf))(input)
+    }
+
+    /// Nom parser. Parses Tree::Node case.
     fn parse_node(input: &str) -> IResult<&str, Self> {
         let parser = tuple((char('['), Tree::parse, char(','), Tree::parse, char(']')));
         let mut discard_delimiter_parser = map(parser, |(_, l, _, r, _)| Self::Node {
@@ -42,22 +48,7 @@ impl Tree {
 
     /// Nom parser. Parses Tree::Leaf case.
     fn parse_leaf(input: &str) -> IResult<&str, Self> {
-        /// Nom parser. Parses exactly one decimal digit.
-        fn parse_one_digit(input: &str) -> IResult<&str, u8> {
-            let str_to_digit = |input: &str| input.parse::<u8>();
-
-            fn is_digit(c: char) -> bool {
-                c.is_digit(10)
-            }
-
-            map_res(take_while_m_n(1, 1, is_digit), str_to_digit)(input)
-        }
         map(parse_one_digit, Tree::Leaf)(input)
-    }
-
-    /// Nom parser. Parses either Leaf or Node.
-    fn parse(input: &str) -> IResult<&str, Self> {
-        alt((Self::parse_node, Self::parse_leaf))(input)
     }
 
     pub fn magnitude(&self) -> u16 {
@@ -68,6 +59,17 @@ impl Tree {
             Tree::Node { l, r } => 3 * l.magnitude() + 2 * r.magnitude(),
         }
     }
+}
+
+/// Nom parser. Parses exactly one decimal digit.
+fn parse_one_digit(input: &str) -> IResult<&str, u8> {
+    let str_to_digit = |input: &str| input.parse::<u8>();
+
+    fn is_digit(c: char) -> bool {
+        c.is_digit(10)
+    }
+
+    map_res(take_while_m_n(1, 1, is_digit), str_to_digit)(input)
 }
 
 impl FromStr for Tree {
@@ -84,35 +86,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse() {
-        let tests = [
-            ("[1,2]", true),
-            ("[[1,2],3]", true),
-            ("[9,[8,7]]", true),
-            ("[[1,9],[8,5]]", true),
-            ("[[[[1,2],[3,4]],[[5,6],[7,8]]],9]", true),
-            ("[[[9,[3,8]],[[0,9],6]],[[[3,7],[4,9]],3]]", true),
-            (
-                "[[[[1,3],[5,3]],[[1,3],[8,7]]],[[[4,9],[6,9]],[[8,2],[7,3]]]]",
-                true,
-            ),
-        ];
-        for (input_str, should_parse) in tests {
-            assert_eq!(Tree::parse(input_str).is_ok(), should_parse);
-        }
-    }
-
-    #[test]
     fn all_representations_are_equivalent() {
         let inputs = vec!["[[1,2],3]", "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]"];
         for input in inputs {
-            // Parsing strings into and out of Trees
-            let tree = Tree::from_str(input).unwrap();
-            let s1 = tree.to_string();
-            assert_eq!(s1, input);
-            // Parsing strings into and out of TokenStreams
-            let stream = TokenStream::from_str(&s1).unwrap();
-            assert_eq!(s1, stream.to_string());
+            let tree1 = Tree::from_str(input).unwrap().to_string();
+            let tree2 = TokenStream::from_str(input).unwrap().to_string();
+            assert_eq!(tree1, tree2);
         }
     }
 

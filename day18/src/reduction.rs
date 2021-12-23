@@ -1,16 +1,13 @@
+//! Snailfish reduction rules
 use crate::tokenstream::*;
 
 pub fn reduce(ts: TokenStream) -> TokenStream {
     let mut curr = ts;
     loop {
-        let exploded = apply_explode(&curr);
-        if exploded != curr {
-            curr = exploded;
+        if apply_explode(&mut curr) {
             continue;
         }
-        let split = apply_split(&curr);
-        if split != curr {
-            curr = split;
+        if apply_split(&mut curr) {
             continue;
         }
         break;
@@ -18,37 +15,34 @@ pub fn reduce(ts: TokenStream) -> TokenStream {
     curr
 }
 
-fn apply_split(ts: &TokenStream) -> TokenStream {
-    let new_tokens = ts
-        .tokens
-        .iter()
-        .fold(
-            (Vec::new(), false),
-            |(mut new_tokens, mut split_done), token| {
-                match token {
-                    Token::Num(n) if n >= &10 && !split_done => {
-                        let (l, r) = split(*n);
-                        new_tokens.extend([
-                            Token::Open,
-                            // the left element of the pair should be the regular number divided by two
-                            // and rounded down
-                            Token::Num(l),
-                            Token::Comma,
-                            // the right element of the pair should be the regular number divided by two
-                            // and rounded up.
-                            Token::Num(r),
-                            Token::Close,
-                        ]);
-                        split_done = true;
-                    }
-                    other => new_tokens.push(*other),
+/// Returns true if a number was split.
+fn apply_split(ts: &mut TokenStream) -> bool {
+    let (new_tokens, split_done) = ts.0.iter().fold(
+        (Vec::new(), false),
+        |(mut new_tokens, mut split_done), token| {
+            match token {
+                Token::Num(n) if n >= &10 && !split_done => {
+                    let (l, r) = split(*n);
+                    new_tokens.extend([
+                        Token::Open,
+                        // the left element of the pair should be the regular number divided by two
+                        // and rounded down
+                        Token::Num(l),
+                        Token::Comma,
+                        // the right element of the pair should be the regular number divided by two
+                        // and rounded up.
+                        Token::Num(r),
+                        Token::Close,
+                    ]);
+                    split_done = true;
                 }
-                (new_tokens, split_done)
-            },
-        )
-        .0;
-
-    TokenStream { tokens: new_tokens }
+                other => new_tokens.push(*other),
+            }
+            (new_tokens, split_done)
+        },
+    );
+    ts.0 = new_tokens;
+    split_done
 }
 
 fn split(n: u8) -> (u8, u8) {
@@ -57,7 +51,8 @@ fn split(n: u8) -> (u8, u8) {
     (l, r)
 }
 
-fn apply_explode(ts: &TokenStream) -> TokenStream {
+/// Returns true if a pair was exploded.
+fn apply_explode(ts: &mut TokenStream) -> bool {
     enum Explode {
         None,
         Carry(u8),
@@ -69,60 +64,51 @@ fn apply_explode(ts: &TokenStream) -> TokenStream {
     let mut depth = 0u16;
     let mut i = 0;
 
-    while i < ts.tokens.len() {
-        let token = ts.tokens[i];
+    while i < ts.0.len() {
+        let token = ts.0[i];
         match token {
-            t @ Token::Open => {
-                depth += 1;
-                new_tokens.push(t);
-                i += 1;
-            }
-            t @ Token::Close => {
-                depth -= 1;
-                new_tokens.push(t);
-                i += 1;
-            }
-            t @ Token::Num(n) => {
-                match explode {
-                    Explode::None => {
-                        if depth > 4 && ts.tokens[i + 1] == Token::Comma {
-                            if let Token::Num(n_right) = &ts.tokens[i + 2] {
-                                explode = Explode::Carry(*n_right);
-                                // Go backwards through the new tokens until you find a number
-                                for j in (0..new_tokens.len()).rev() {
-                                    if let Token::Num(m) = new_tokens[j] {
-                                        // Add the left elem of exploding pair
-                                        new_tokens[j] = Token::Num(m + n);
-                                        break;
-                                    }
-                                }
-                                i += 4;
-                                new_tokens.pop();
-                                new_tokens.push(Token::Num(0));
-                                continue;
-                            }
+            Token::Comma => {}
+            Token::Open => depth += 1,
+            Token::Close => depth -= 1,
+            Token::Num(n) => match explode {
+                Explode::Done => {}
+                Explode::None => {
+                    if depth > 4 && ts.0[i + 1] == Token::Comma {
+                        if let Token::Num(n_right) = &ts.0[i + 2] {
+                            explode = Explode::Carry(*n_right);
+                            add_to(&mut new_tokens, n);
+                            i += 4;
+                            new_tokens.pop();
+                            new_tokens.push(Token::Num(0));
+                            continue;
                         }
-                        i += 1;
-                        new_tokens.push(t);
-                    }
-                    Explode::Carry(n_right) => {
-                        new_tokens.push(Token::Num(n + n_right));
-                        explode = Explode::Done;
-                        i += 1;
-                    }
-                    Explode::Done => {
-                        i += 1;
-                        new_tokens.push(t);
                     }
                 }
-            }
-            t @ Token::Comma => {
-                new_tokens.push(t);
-                i += 1;
-            }
+                Explode::Carry(n_right) => {
+                    new_tokens.push(Token::Num(n + n_right));
+                    explode = Explode::Done;
+                    i += 1;
+                    continue;
+                }
+            },
+        }
+        // Advance the loop
+        new_tokens.push(token);
+        i += 1;
+    }
+    ts.0 = new_tokens;
+    !matches!(explode, Explode::None)
+}
+
+fn add_to(new_tokens: &mut [Token], n: u8) {
+    // Go backwards through the new tokens until you find a number
+    for j in (0..new_tokens.len()).rev() {
+        if let Token::Num(m) = new_tokens[j] {
+            // Add the left elem of exploding pair
+            new_tokens[j] = Token::Num(m + n);
+            break;
         }
     }
-    TokenStream { tokens: new_tokens }
 }
 
 #[cfg(test)]
@@ -134,11 +120,11 @@ mod tests {
     #[test]
     fn test_apply_split() {
         let input_str = "[[[[0,7],4],[15,[0,13]]],[1,1]]";
-        let input = TokenStream::from_str(input_str).unwrap();
+        let mut stream = TokenStream::from_str(input_str).unwrap();
         let expected = TokenStream::from_str("[[[[0,7],4],[[7,8],[0,13]]],[1,1]]").unwrap();
-        let actual = apply_split(&input);
+        assert!(apply_split(&mut stream));
         assert_eq!(
-            actual.to_string(),
+            stream.to_string(),
             expected.to_string(),
             "input: {}",
             input_str
@@ -177,16 +163,11 @@ mod tests {
                 "",
             ),
         ];
-        for (input, expected_exploded, why) in tests {
-            let ts = TokenStream::from_str(input).unwrap();
-            let actual_exploded = apply_explode(&ts);
-            assert_eq!(
-                actual_exploded.to_string(),
-                expected_exploded,
-                "input {}. {}",
-                input,
-                why
-            );
+        for (input, expected, why) in tests {
+            let mut ts = TokenStream::from_str(input).unwrap();
+            let exploded = apply_explode(&mut ts);
+            assert!(exploded);
+            assert_eq!(ts.to_string(), expected, "input {}. {}", input, why);
         }
     }
 
