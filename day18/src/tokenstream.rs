@@ -57,12 +57,12 @@ impl std::fmt::Display for TokenStream {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Token::Open => "[".to_owned(),
-            Token::Close => "]".to_owned(),
-            Token::Num(n) => n.to_string(),
-            Token::Comma => ",".to_owned(),
+            Token::Open => "[",
+            Token::Close => "]",
+            Token::Num(n) => return write!(f, "{}", n),
+            Token::Comma => ",",
         };
-        write!(f, "{}", s)
+        f.write_str(s)
     }
 }
 
