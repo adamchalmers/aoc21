@@ -72,7 +72,11 @@ impl std::ops::Add for TokenStream {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let s = ["[", &self.to_string(), ",", &rhs.to_string(), "]"].join("");
-        reduce(TokenStream::from_str(&s).unwrap())
+        let mut combined = vec![Token::Open];
+        combined.extend(self.0);
+        combined.push(Token::Comma);
+        combined.extend(rhs.0);
+        combined.push(Token::Close);
+        reduce(TokenStream(combined))
     }
 }
