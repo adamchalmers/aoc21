@@ -43,6 +43,10 @@ pub fn parse_number_from_token(input: &[Token]) -> IResult<&[Token], u16> {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use crate::tokenstream::TokenStream;
+
     use super::*;
 
     #[test]
@@ -59,7 +63,8 @@ mod tests {
             ),
         ];
         for (input, expected_magnitude) in tests {
-            let actual_magnitude = parse_magnitude(input);
+            let stream = TokenStream::from_str(input).unwrap();
+            let actual_magnitude = parse_magnitude(&stream.0);
             assert_eq!(actual_magnitude, expected_magnitude, "case {}", input);
         }
     }
