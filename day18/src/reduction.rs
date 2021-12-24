@@ -1,18 +1,17 @@
 //! Snailfish reduction rules
 use crate::tokenstream::*;
 
-pub fn reduce(ts: TokenStream) -> TokenStream {
-    let mut curr = ts;
+pub fn reduce(mut ts: TokenStream) -> TokenStream {
     loop {
-        if apply_explode(&mut curr) {
+        if apply_explode(&mut ts) {
             continue;
         }
-        if apply_split(&mut curr) {
+        if apply_split(&mut ts) {
             continue;
         }
         break;
     }
-    curr
+    ts
 }
 
 /// Returns true if a number was split.
