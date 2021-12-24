@@ -17,7 +17,7 @@ pub fn reduce(mut ts: TokenStream) -> TokenStream {
 /// Returns true if a number was split.
 fn apply_split(ts: &mut TokenStream) -> bool {
     let (new_tokens, split_done) = ts.0.iter().fold(
-        (Vec::new(), false),
+        (Vec::with_capacity(ts.0.len() * 2), false),
         |(mut new_tokens, mut split_done), token| {
             match *token {
                 Token::Num(n) if n >= 10 && !split_done => {
@@ -58,7 +58,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
         Done,
     }
 
-    let mut new_tokens = Vec::new();
+    let mut new_tokens = Vec::with_capacity(ts.0.len() * 2);
     let mut explode = Explode::None;
     let mut depth = 0u16;
     let mut i = 0;
