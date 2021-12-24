@@ -27,9 +27,9 @@ fn homework_q2(s: &str) -> u16 {
     nums.iter()
         .flat_map(|x| {
             nums.iter()
-                .map(|y| (x.to_owned(), y.to_owned()))
+                .map(move |y| (x, y))
                 .filter(|(x, y)| y != x)
-                .map(|(x, y)| (x + y).magnitude())
+                .map(|(x, y)| (x.to_owned() + y).magnitude())
         })
         .max()
         .unwrap()

@@ -80,3 +80,16 @@ impl std::ops::Add for TokenStream {
         reduce(TokenStream(combined))
     }
 }
+
+impl std::ops::Add<&Self> for TokenStream {
+    type Output = Self;
+
+    fn add(self, rhs: &Self) -> Self::Output {
+        let mut combined = vec![Token::Open];
+        combined.extend(self.0);
+        combined.push(Token::Comma);
+        combined.extend(rhs.0.iter().copied());
+        combined.push(Token::Close);
+        reduce(TokenStream(combined))
+    }
+}
