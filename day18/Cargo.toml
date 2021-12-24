@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 nom = { version = "7", git = "https://github.com/jyn514/nom", branch = "blanket-impls" }
+
+[profile.release]
+lto = "fat"
