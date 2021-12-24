@@ -1,16 +1,11 @@
 //! Snailfish reduction rules
 use crate::tokenstream::*;
 
+const EXPLODE_DEPTH: u8 = 4;
+const SPLIT_SIZE: u16 = 10;
+
 pub fn reduce(mut ts: TokenStream) -> TokenStream {
-    loop {
-        if apply_explode(&mut ts) {
-            continue;
-        }
-        if apply_split(&mut ts) {
-            continue;
-        }
-        break;
-    }
+    while apply_explode(&mut ts) || apply_split(&mut ts) {}
     ts
 }
 
@@ -20,16 +15,12 @@ fn apply_split(ts: &mut TokenStream) -> bool {
         (Vec::with_capacity(ts.0.len()), false),
         |(mut new_tokens, mut split_done), token| {
             match token {
-                Token::Num(n) if n >= &10 && !split_done => {
+                Token::Num(n) if n >= &SPLIT_SIZE && !split_done => {
                     let (l, r) = split(*n);
                     new_tokens.extend([
                         Token::Open,
-                        // the left element of the pair should be the regular number divided by two
-                        // and rounded down
                         Token::Num(l),
                         Token::Comma,
-                        // the right element of the pair should be the regular number divided by two
-                        // and rounded up.
                         Token::Num(r),
                         Token::Close,
                     ]);
@@ -45,7 +36,11 @@ fn apply_split(ts: &mut TokenStream) -> bool {
 }
 
 fn split(n: u16) -> (u16, u16) {
+    // the left element of the pair should be the regular number divided by two
+    // and rounded down
     let l = n / 2;
+    // the right element of the pair should be the regular number divided by two
+    // and rounded up.
     let r = (n + 2 - 1) / 2;
     (l, r)
 }
@@ -60,7 +55,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
 
     let mut new_tokens = Vec::with_capacity(ts.0.len());
     let mut explode = Explode::None;
-    let mut depth = 0u16;
+    let mut depth = 0u8;
     let mut i = 0;
 
     while i < ts.0.len() {
@@ -72,7 +67,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
             Token::Num(n) => match explode {
                 Explode::Done => {}
                 Explode::None => {
-                    if depth > 4 && ts.0[i + 1] == Token::Comma {
+                    if depth > EXPLODE_DEPTH && ts.0[i + 1] == Token::Comma {
                         if let Token::Num(n_right) = ts.0[i + 2] {
                             explode = Explode::Carry(n_right);
                             add_to(&mut new_tokens, n);

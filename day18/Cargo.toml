@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 nom = "7"
+
+[profile.release]
+debug = true
+lto = "fat"

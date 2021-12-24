@@ -10,3 +10,9 @@ calculating magnitudes, after which it's discarded. So, I repurposed the Tree pa
 returning a tree, it just adds up the magnitude as it goes, returning a u16. This was the first time
 I had used Nom to "consume" a data structure, instead of just parsing it into some nice 
 representation.
+
+Speed improvements:
+Baseline upon first solving:            676.6 ms ±  43.8 ms
+Initing newtoken vec with capacity:     479.2 ms ±   8.2 ms
+Using chars, not strs in Token::fmt     355.7 ms ±   3.8 ms
+No stringifying in Add                  282.5 ms ±  11.5 ms
