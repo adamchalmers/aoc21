@@ -64,7 +64,8 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
     let mut i = 0;
 
     while i < ts.0.len() {
-        let token = ts.0[i];
+        // SAFETY: we just checked that `i < ts.0.len`.
+        let token = unsafe { *ts.0.get_unchecked(i) };
         match token {
             Token::Comma => {}
             Token::Open => depth += 1,
