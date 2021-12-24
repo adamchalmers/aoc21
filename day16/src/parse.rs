@@ -162,7 +162,7 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
 /// So we store the u4s in u8s, and then use bit-shifting operations to put them into the right
 /// column of the larger binary number we're working with.
 fn from_nibble((i, nibble): (usize, u8)) -> u64 {
-    (nibble as u64) << (4 * i)
+    u64::from(nibble) << (4 * i)
 }
 
 /// Every type_id corresponds to a particular operation.
