@@ -41,7 +41,7 @@ impl TokenStream {
     }
 
     pub fn magnitude(self) -> u16 {
-        parse_magnitude(&self.to_string())
+        parse_magnitude(&self.0)
     }
 }
 

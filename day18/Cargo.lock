@@ -24,8 +24,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 [[package]]
 name = "nom"
 version = "7.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1d11e1ef389c76fe5b81bcaf2ea32cf88b62bc494e19f493d0b30e7a930109"
+source = "git+https://github.com/jyn514/nom?branch=blanket-impls#cbbe1419369a9c2611ec8a3993454e5eeef79ed6"
 dependencies = [
  "memchr",
  "minimal-lexical",

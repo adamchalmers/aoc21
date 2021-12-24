@@ -1,22 +1,25 @@
 use nom::{
-    branch::alt, bytes::complete::take_while_m_n, character::complete::char, combinator::map,
-    combinator::map_res, sequence::tuple, IResult,
+    branch::alt, bytes::complete::{take_while_m_n, tag}, combinator::map,
+    combinator::map_res, sequence::tuple, IResult, Needed,
 };
 
+use crate::tokenstream::Token;
+
 /// Iterate over a Snailfish number, adding up its magnitude as you go.
-pub fn parse_magnitude(input: &str) -> u16 {
+pub fn parse_magnitude(input: &[Token]) -> u16 {
     magnitude(input).unwrap().1
 }
 
 // Parse a stringified Snailfish number, adding up its magnitude.
-fn magnitude(input: &str) -> IResult<&str, u16> {
+fn magnitude(input: &[Token]) -> IResult<&[Token], u16> {
     // An element can be either a pair of elements, or a number literal.
-    alt((magnitude_of_pair, parse_number))(input)
+    alt((magnitude_of_pair, parse_number_from_token))(input)
 }
 
 // Parse a stringified Snailfish pair, adding up its magnitude.
-fn magnitude_of_pair(input: &str) -> IResult<&str, u16> {
-    let parser = tuple((char('['), magnitude, char(','), magnitude, char(']')));
+fn magnitude_of_pair(input: &[Token]) -> IResult<&[Token], u16> {
+    let eat = |t| tag(std::slice::from_ref(t));
+    let parser = tuple((eat(&Token::Open), magnitude, eat(&Token::Comma), magnitude, eat(&Token::Close)));
     let mut discard_delimiter_parser = map(parser, |(_, l, _, r, _)| 3 * l + 2 * r);
     discard_delimiter_parser(input)
 }
@@ -27,6 +30,15 @@ pub fn parse_number(input: &str) -> IResult<&str, u16> {
         take_while_m_n(1, 1, |c: char| c.is_digit(10)),
         |input: &str| input.parse(),
     )(input)
+}
+
+pub fn parse_number_from_token(input: &[Token]) -> IResult<&[Token], u16> {
+    use nom::Err;
+    match input.get(0) {
+        None => Err(Err::Incomplete(Needed::new(1))),
+        Some(Token::Num(n)) => Ok((&input[1..], *n)),
+        Some(_) => Err(Err::Error(nom::error::Error { input, code: nom::error::ErrorKind::Tag })),
+    }
 }
 
 #[cfg(test)]
