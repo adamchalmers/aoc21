@@ -45,7 +45,7 @@ fn apply_split(ts: &mut TokenStream) -> bool {
     split_done
 }
 
-fn split(n: u8) -> (u8, u8) {
+fn split(n: u16) -> (u16, u16) {
     let l = n / 2;
     let r = (n + 2 - 1) / 2;
     (l, r)
@@ -55,7 +55,7 @@ fn split(n: u8) -> (u8, u8) {
 fn apply_explode(ts: &mut TokenStream) -> bool {
     enum Explode {
         None,
-        Carry(u8),
+        Carry(u16),
         Done,
     }
 
@@ -100,7 +100,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
     !matches!(explode, Explode::None)
 }
 
-fn add_to(new_tokens: &mut [Token], n: u8) {
+fn add_to(new_tokens: &mut [Token], n: u16) {
     // Go backwards through the new tokens until you find a number
     for j in (0..new_tokens.len()).rev() {
         if let Token::Num(m) = new_tokens[j] {

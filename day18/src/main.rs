@@ -1,6 +1,6 @@
+mod magnitude;
 mod reduction;
 mod tokenstream;
-mod tree;
 
 use std::str::FromStr;
 
