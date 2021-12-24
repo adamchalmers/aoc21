@@ -19,9 +19,9 @@ fn apply_split(ts: &mut TokenStream) -> bool {
     let (new_tokens, split_done) = ts.0.iter().fold(
         (Vec::new(), false),
         |(mut new_tokens, mut split_done), token| {
-            match token {
-                Token::Num(n) if n >= &10 && !split_done => {
-                    let (l, r) = split(*n);
+            match *token {
+                Token::Num(n) if n >= 10 && !split_done => {
+                    let (l, r) = split(n);
                     new_tokens.extend([
                         Token::Open,
                         // the left element of the pair should be the regular number divided by two
@@ -35,7 +35,7 @@ fn apply_split(ts: &mut TokenStream) -> bool {
                     ]);
                     split_done = true;
                 }
-                other => new_tokens.push(*other),
+                other => new_tokens.push(other),
             }
             (new_tokens, split_done)
         },
