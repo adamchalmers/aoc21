@@ -55,10 +55,10 @@ impl std::fmt::Display for TokenStream {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Token::Open => "[".to_owned(),
-            Token::Close => "]".to_owned(),
-            Token::Num(n) => n.to_string(),
-            Token::Comma => ",".to_owned(),
+            Token::Open => '[',
+            Token::Close => ']',
+            Token::Num(n) => return write!(f, "{}", n),
+            Token::Comma => ',',
         };
         write!(f, "{}", s)
     }
@@ -70,7 +70,13 @@ impl std::ops::Add for TokenStream {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let s = ["[", &self.to_string(), ",", &rhs.to_string(), "]"].join("");
-        reduce(TokenStream::from_str(&s).unwrap())
+        let mut tokens = Vec::with_capacity(self.0.len() + rhs.0.len() + 3);
+        tokens.push(Token::Open);
+        tokens.extend(self.0);
+        tokens.push(Token::Comma);
+        tokens.extend(rhs.0);
+        tokens.push(Token::Close);
+        let ts = TokenStream(tokens);
+        reduce(ts)
     }
 }

@@ -1,24 +1,23 @@
 //! Snailfish reduction rules
 use crate::tokenstream::*;
 
-pub fn reduce(ts: TokenStream) -> TokenStream {
-    let mut curr = ts;
+pub fn reduce(mut ts: TokenStream) -> TokenStream {
     loop {
-        if apply_explode(&mut curr) {
+        if apply_explode(&mut ts) {
             continue;
         }
-        if apply_split(&mut curr) {
+        if apply_split(&mut ts) {
             continue;
         }
         break;
     }
-    curr
+    ts
 }
 
 /// Returns true if a number was split.
 fn apply_split(ts: &mut TokenStream) -> bool {
     let (new_tokens, split_done) = ts.0.iter().fold(
-        (Vec::new(), false),
+        (Vec::with_capacity(ts.0.len()), false),
         |(mut new_tokens, mut split_done), token| {
             match token {
                 Token::Num(n) if n >= &10 && !split_done => {
@@ -59,7 +58,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
         Done,
     }
 
-    let mut new_tokens = Vec::new();
+    let mut new_tokens = Vec::with_capacity(ts.0.len());
     let mut explode = Explode::None;
     let mut depth = 0u16;
     let mut i = 0;
@@ -74,12 +73,12 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
                 Explode::Done => {}
                 Explode::None => {
                     if depth > 4 && ts.0[i + 1] == Token::Comma {
-                        if let Token::Num(n_right) = &ts.0[i + 2] {
-                            explode = Explode::Carry(*n_right);
+                        if let Token::Num(n_right) = ts.0[i + 2] {
+                            explode = Explode::Carry(n_right);
                             add_to(&mut new_tokens, n);
+                            let len = new_tokens.len();
+                            new_tokens[len - 1] = Token::Num(0);
                             i += 4;
-                            new_tokens.pop();
-                            new_tokens.push(Token::Num(0));
                             continue;
                         }
                     }
