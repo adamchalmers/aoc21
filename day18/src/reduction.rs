@@ -102,10 +102,10 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
 
 fn add_to(new_tokens: &mut [Token], n: u16) {
     // Go backwards through the new tokens until you find a number
-    for j in (0..new_tokens.len()).rev() {
-        if let Token::Num(m) = new_tokens[j] {
+    for token in new_tokens.iter_mut().rev() {
+        if let Token::Num(m) = token {
             // Add the left elem of exploding pair
-            new_tokens[j] = Token::Num(m + n);
+            *m += n;
             break;
         }
     }
