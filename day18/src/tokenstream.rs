@@ -47,8 +47,10 @@ impl TokenStream {
 
 impl std::fmt::Display for TokenStream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: String = self.0.iter().map(|token| token.to_string()).collect();
-        write!(f, "{}", s)
+        for token in &self.0 {
+            write!(f, "{}", token)?;
+        }
+        Ok(())
     }
 }
 
