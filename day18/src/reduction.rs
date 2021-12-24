@@ -73,8 +73,8 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
                 Explode::Done => {}
                 Explode::None => {
                     if depth > 4 && ts.0[i + 1] == Token::Comma {
-                        if let Token::Num(n_right) = &ts.0[i + 2] {
-                            explode = Explode::Carry(*n_right);
+                        if let Token::Num(n_right) = ts.0[i + 2] {
+                            explode = Explode::Carry(n_right);
                             add_to(&mut new_tokens, n);
                             i += 4;
                             new_tokens.pop();
