@@ -25,9 +25,11 @@ fn homework_q2(s: &str) -> u16 {
         .map(|l| TokenStream::from_str(l).unwrap())
         .collect();
     nums.iter()
-        .flat_map(|num0| {
+        .flat_map(|x| {
             nums.iter()
-                .map(|num1| (num0.to_owned() + num1.to_owned()).magnitude())
+                .map(|y| (x.to_owned(), y.to_owned()))
+                .filter(|(x, y)| y != x)
+                .map(|(x, y)| (x + y).magnitude())
         })
         .max()
         .unwrap()
