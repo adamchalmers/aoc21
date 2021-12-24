@@ -1,5 +1,5 @@
 use nom::{
-    branch::alt, bytes::complete::take_while_m_n, character::complete::char, combinator::map,
+    branch::alt, bytes::complete::take_while, character::complete::char, combinator::map,
     combinator::map_res, sequence::tuple, IResult,
 };
 
@@ -23,10 +23,9 @@ fn magnitude_of_pair(input: &str) -> IResult<&str, u16> {
 
 // Parse a sequence of digits into a number.
 pub fn parse_number(input: &str) -> IResult<&str, u16> {
-    map_res(
-        take_while_m_n(1, 1, |c: char| c.is_digit(10)),
-        |input: &str| input.parse(),
-    )(input)
+    map_res(take_while(|c: char| c.is_digit(10)), |input: &str| {
+        input.parse()
+    })(input)
 }
 
 #[cfg(test)]
