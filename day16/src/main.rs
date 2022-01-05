@@ -2,27 +2,21 @@ mod parse;
 
 fn main() {
     let input = parse::parse_hex(include_str!("data/input.txt"));
-    let (_rem, packets) = Packet::parse(&input).unwrap();
+    let (_remaining_input, packets) = Packet::parse(&input).unwrap();
     println!("Q1: {}", packets.sum_versions());
     println!("Q2: {}", packets.eval());
 }
 
-/// A way of packing numeric expressions into a binary sequence.
+/// A tree structure that represents some number. Can be parsed out of its binary encoding.
 #[derive(Eq, PartialEq, Debug)]
-struct Packet {
-    version: u8,
-    body: PacketBody,
-}
-
-/// Forms a tree structure.
-#[derive(Eq, PartialEq, Debug)]
-enum PacketBody {
-    /// Internal node.
-    /// Represents a number directly.
-    Literal(u64),
+enum Packet {
     /// Leaf node.
+    /// Represents a number directly.
+    Literal { version: u8, value: u64 },
+    /// Internal node.
     /// Represents the number you get from running the given operation on the given subpackets.
     Operator {
+        version: u8,
         type_id: Operation,
         subpackets: Vec<Packet>,
     },
@@ -43,50 +37,42 @@ enum Operation {
 impl Packet {
     /// Used for Q1. Simply sum all version numbers in every packet.
     fn sum_versions(&self) -> u64 {
-        let curr = self.version as u64;
-        match &self.body {
-            PacketBody::Literal(_) => curr,
-            PacketBody::Operator { subpackets, .. } => {
-                subpackets.iter().map(|p| p.sum_versions()).sum::<u64>() + curr
-            }
+        match &self {
+            Packet::Literal { version, .. } => *version as u64,
+            Packet::Operator {
+                subpackets,
+                version,
+                ..
+            } => subpackets.iter().map(|p| p.sum_versions()).sum::<u64>() + (*version as u64),
         }
     }
 
     /// Evaluate the packet's numeric expression.
     fn eval(&self) -> u64 {
-        match &self.body {
-            PacketBody::Literal(n) => *n,
-            PacketBody::Operator {
+        match &self {
+            Packet::Literal { value, .. } => *value,
+            Packet::Operator {
                 type_id,
                 subpackets,
+                ..
             } => match type_id {
                 Operation::Sum => subpackets.iter().map(|p| p.eval()).sum(),
                 Operation::Product => subpackets.iter().map(|p| p.eval()).product(),
                 Operation::Min => subpackets.iter().map(|p| p.eval()).min().unwrap(),
                 Operation::Max => subpackets.iter().map(|p| p.eval()).max().unwrap(),
-                Operation::Greater => {
-                    if subpackets[0].eval() > subpackets[1].eval() {
-                        1
-                    } else {
-                        0
-                    }
-                }
-                Operation::Less => {
-                    if subpackets[0].eval() < subpackets[1].eval() {
-                        1
-                    } else {
-                        0
-                    }
-                }
-                Operation::Equal => {
-                    if subpackets[0].eval() == subpackets[1].eval() {
-                        1
-                    } else {
-                        0
-                    }
-                }
+                Operation::Greater => bool_to_u1(subpackets[0].eval() > subpackets[1].eval()),
+                Operation::Less => bool_to_u1(subpackets[0].eval() < subpackets[1].eval()),
+                Operation::Equal => bool_to_u1(subpackets[0].eval() == subpackets[1].eval()),
             },
         }
+    }
+}
+
+fn bool_to_u1(b: bool) -> u64 {
+    if b {
+        1
+    } else {
+        0
     }
 }
 

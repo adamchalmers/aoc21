@@ -1,4 +1,4 @@
-use crate::{Operation, Packet, PacketBody};
+use crate::{Operation, Packet};
 use nom::{
     bits::{bits, complete::take},
     IResult,
@@ -85,20 +85,35 @@ impl Packet {
     /// Parse a Packet from a sequence of bits.
     fn parse_from_bits(i: BitInput) -> IResult<BitInput, Self> {
         let (i, header) = Header::parse(i)?;
-        let (i, body) = match header.type_id {
-            4 => parse_literal_number(i)?,
-            other => parse_operator(i, other)?,
-        };
-        let packet = Packet {
-            version: header.version,
-            body,
+        let (i, packet) = match header.type_id {
+            4 => {
+                let (i_remaining, value) = parse_literal_number(i)?;
+                (
+                    i_remaining,
+                    Self::Literal {
+                        version: header.version,
+                        value,
+                    },
+                )
+            }
+            other => {
+                let (i_remaining, (subpackets, type_id)) = parse_operator(i, other)?;
+                (
+                    i_remaining,
+                    Self::Operator {
+                        version: header.version,
+                        subpackets,
+                        type_id,
+                    },
+                )
+            }
         };
         Ok((i, packet))
     }
 }
 
 /// Parse a PacketBody::Operator from a sequence of bits.
-fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
+fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, (Vec<Packet>, Operation)> {
     let mut subpackets = Vec::new();
     let (remaining_i, length_type_id) = take_up_to_8_bits(i, 1)?;
     i = remaining_i;
@@ -127,17 +142,11 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
         }
     }
 
-    Ok((
-        i,
-        PacketBody::Operator {
-            subpackets,
-            type_id: Operation::from(type_id),
-        },
-    ))
+    Ok((i, (subpackets, Operation::from(type_id))))
 }
 
-/// Parse a PacketBody::Literal from a sequence of bits.
-fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
+/// Parse the number literal from a sequence of bits.
+fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, u64> {
     let mut half_bytes = Vec::new();
     loop {
         let (remaining_i, bit) = take_up_to_8_bits(i, 1)?;
@@ -155,7 +164,7 @@ fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
         .map(|(i, b)| (n - i, b))
         .map(from_nibble)
         .sum();
-    Ok((i, PacketBody::Literal(num)))
+    Ok((i, num))
 }
 
 /// A nibble is a u4 (half a byte). But Rust doesn't have a u4 type!
@@ -213,9 +222,9 @@ mod tests {
     fn test_parse_literal() {
         let input = parse_hex(EXAMPLE_LITERAL);
         let (_rem, actual) = Packet::parse(&input).unwrap();
-        let expected = Packet {
+        let expected = Packet::Literal {
             version: 6,
-            body: PacketBody::Literal(2021),
+            value: 2021,
         };
         assert_eq!(actual, expected);
     }
@@ -224,9 +233,9 @@ mod tests {
     fn test_parse_literal2() {
         let input = [0b11010001, 0b01000000];
         let (_, actual) = Packet::parse(&input).unwrap();
-        let expected = Packet {
+        let expected = Packet::Literal {
             version: 6,
-            body: PacketBody::Literal(10),
+            value: 10,
         };
         assert_eq!(actual, expected);
     }
@@ -234,9 +243,9 @@ mod tests {
     fn test_parse_literal3() {
         let input = [0b01010010, 0b00100100];
         let (_, actual) = Packet::parse(&input).unwrap();
-        let expected = Packet {
+        let expected = Packet::Literal {
             version: 2,
-            body: PacketBody::Literal(20),
+            value: 20,
         };
         assert_eq!(actual, expected);
     }
@@ -245,21 +254,19 @@ mod tests {
     fn test_parse_operator_total_length() {
         let input = parse_hex("38006F45291200");
         let (_, actual) = Packet::parse(&input).unwrap();
-        let expected = Packet {
+        let expected = Packet::Operator {
             version: 1,
-            body: PacketBody::Operator {
-                type_id: Operation::from(6),
-                subpackets: vec![
-                    Packet {
-                        version: 6,
-                        body: PacketBody::Literal(10),
-                    },
-                    Packet {
-                        version: 2,
-                        body: PacketBody::Literal(20),
-                    },
-                ],
-            },
+            type_id: Operation::from(6),
+            subpackets: vec![
+                Packet::Literal {
+                    version: 6,
+                    value: 10,
+                },
+                Packet::Literal {
+                    version: 2,
+                    value: 20,
+                },
+            ],
         };
         assert_eq!(actual, expected);
     }
@@ -268,25 +275,23 @@ mod tests {
     fn test_parse_operator_num_subpackets() {
         let input = parse_hex("EE00D40C823060");
         let (_, actual) = Packet::parse(&input).unwrap();
-        let expected = Packet {
+        let expected = Packet::Operator {
             version: 7,
-            body: PacketBody::Operator {
-                type_id: Operation::from(3),
-                subpackets: vec![
-                    Packet {
-                        version: 2,
-                        body: PacketBody::Literal(1),
-                    },
-                    Packet {
-                        version: 4,
-                        body: PacketBody::Literal(2),
-                    },
-                    Packet {
-                        version: 1,
-                        body: PacketBody::Literal(3),
-                    },
-                ],
-            },
+            type_id: Operation::from(3),
+            subpackets: vec![
+                Packet::Literal {
+                    version: 2,
+                    value: 1,
+                },
+                Packet::Literal {
+                    version: 4,
+                    value: 2,
+                },
+                Packet::Literal {
+                    version: 1,
+                    value: 3,
+                },
+            ],
         };
         assert_eq!(actual, expected);
     }
@@ -302,7 +307,7 @@ mod tests {
         for hex in tests {
             let input = parse_hex(hex);
             let (_, packet) = Packet::parse(&input).unwrap();
-            assert!(matches!(packet.body, PacketBody::Operator { .. }));
+            assert!(matches!(packet, Packet::Operator { .. }));
         }
     }
 
