@@ -26,9 +26,8 @@ fn parse_point(input: &str) -> IResult<&str, Point> {
 
 /// Parse a `Scale` from the start of the input string.
 pub fn parse_numbers(input: &str) -> IResult<&str, Scale> {
-    map_res(take_while(|c: char| c.is_digit(10)), |input| {
-        Scale::from_str(input)
-    })(input)
+    let parse_digits = take_while(|c: char| c.is_digit(10));
+    map_res(parse_digits, Scale::from_str)(input)
 }
 
 // Parse the whole input.
