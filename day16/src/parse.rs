@@ -50,13 +50,13 @@ fn bits_remaining(i: &BitInput) -> usize {
 
 /// Takes n bits from the BitInput.
 /// Returns the remaining BitInput and a number parsed the first n bits.
-fn take_n_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
+fn take_up_to_8_bits(i: BitInput, n: u8) -> IResult<BitInput, u8> {
     take(n)(i)
 }
 
 /// Takes n bits from the BitInput.
 /// Returns the remaining BitInput and a number parsed the first n bits.
-fn take_more_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
+fn take_up_to_16_bits(i: BitInput, n: u8) -> IResult<BitInput, u16> {
     take(n)(i)
 }
 
@@ -69,8 +69,8 @@ struct Header {
 
 impl Header {
     fn parse(i: BitInput) -> IResult<BitInput, Self> {
-        let (i, version) = take_n_bits(i, 3)?;
-        let (i, type_id) = take_n_bits(i, 3)?;
+        let (i, version) = take_up_to_8_bits(i, 3)?;
+        let (i, type_id) = take_up_to_8_bits(i, 3)?;
         Ok((i, Self { version, type_id }))
     }
 }
@@ -100,13 +100,13 @@ impl Packet {
 /// Parse a PacketBody::Operator from a sequence of bits.
 fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody> {
     let mut subpackets = Vec::new();
-    let (j, length_type_id) = take_n_bits(i, 1)?;
-    i = j;
+    let (remaining_i, length_type_id) = take_up_to_8_bits(i, 1)?;
+    i = remaining_i;
     if length_type_id == 0 {
         // the next 15 bits are a number that represents
         // the total length in bits of the sub-packets contained by this packet.
-        let (j, total_subpacket_lengths) = take_more_bits(i, 15)?;
-        i = j;
+        let (remaining_i, total_subpacket_lengths) = take_up_to_16_bits(i, 15)?;
+        i = remaining_i;
 
         // Parse subpackets until the length is reached.
         let initial_bits_remaining = bits_remaining(&i);
@@ -118,12 +118,12 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
     } else {
         // then the next 11 bits are a number that represents
         // the number of sub-packets immediately contained by this packet.
-        let (j, num_subpackets) = take_more_bits(i, 11)?;
-        i = j;
+        let (remaining_i, num_subpackets) = take_up_to_16_bits(i, 11)?;
+        i = remaining_i;
         for _ in 0..num_subpackets {
-            let (j, packet) = Packet::parse_from_bits(i)?;
+            let (remaining_i, packet) = Packet::parse_from_bits(i)?;
             subpackets.push(packet);
-            i = j;
+            i = remaining_i;
         }
     }
 
@@ -140,9 +140,9 @@ fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, PacketBody>
 fn parse_literal_number(mut i: BitInput) -> IResult<BitInput, PacketBody> {
     let mut half_bytes = Vec::new();
     loop {
-        let (j, bit) = take_n_bits(i, 1)?;
-        let (j, half_byte) = take_n_bits(j, 4)?;
-        i = j;
+        let (remaining_i, bit) = take_up_to_8_bits(i, 1)?;
+        let (remaining_i, half_byte) = take_up_to_8_bits(remaining_i, 4)?;
+        i = remaining_i;
         half_bytes.push(half_byte);
         if bit == 0 {
             break;
