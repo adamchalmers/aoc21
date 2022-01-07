@@ -1,6 +1,7 @@
 use crate::{Operation, Packet};
 use nom::{
     bits::{bits, complete::take},
+    multi::length_count,
     IResult,
 };
 
@@ -112,34 +113,28 @@ impl Packet {
 }
 
 /// Parse a PacketBody::Operator from a sequence of bits.
-fn parse_operator(mut i: BitInput, type_id: u8) -> IResult<BitInput, (Vec<Packet>, Operation)> {
-    let mut subpackets = Vec::new();
-    let (remaining_i, length_type_id) = take_up_to_8_bits(i, 1)?;
-    i = remaining_i;
-    if length_type_id == 0 {
+fn parse_operator(i: BitInput, type_id: u8) -> IResult<BitInput, (Vec<Packet>, Operation)> {
+    let (i, length_type_id) = take_up_to_8_bits(i, 1)?;
+    let (i, subpackets) = if length_type_id == 0 {
         // the next 15 bits are a number that represents
         // the total length in bits of the sub-packets contained by this packet.
-        let (remaining_i, total_subpacket_lengths) = take_up_to_16_bits(i, 15)?;
-        i = remaining_i;
+        let (mut i, total_subpacket_lengths) = take_up_to_16_bits(i, 15)?;
 
-        // Parse subpackets until the length is reached.
+        let mut subpackets = Vec::new();
         let initial_bits_remaining = bits_remaining(&i);
+        // Parse subpackets until the correct number of bits have been read.
         while initial_bits_remaining - bits_remaining(&i) < (total_subpacket_lengths as usize) {
-            let (j, packet) = Packet::parse_from_bits(i)?;
-            i = j;
-            subpackets.push(packet);
-        }
-    } else {
-        // then the next 11 bits are a number that represents
-        // the number of sub-packets immediately contained by this packet.
-        let (remaining_i, num_subpackets) = take_up_to_16_bits(i, 11)?;
-        i = remaining_i;
-        for _ in 0..num_subpackets {
             let (remaining_i, packet) = Packet::parse_from_bits(i)?;
-            subpackets.push(packet);
             i = remaining_i;
+            subpackets.push(packet);
         }
-    }
+        (i, subpackets)
+    } else {
+        // the next 11 bits are a number that represents
+        // the number of sub-packets immediately contained by this packet.
+        let parse_num_subpackets = |i| take_up_to_16_bits(i, 11);
+        length_count(parse_num_subpackets, Packet::parse_from_bits)(i)?
+    };
 
     Ok((i, (subpackets, Operation::from(type_id))))
 }
