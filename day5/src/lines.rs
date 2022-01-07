@@ -1,11 +1,9 @@
 use std::cmp::Ordering;
 
-pub type Scale = u32;
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Hash)]
 pub struct Point {
-    pub x: Scale,
-    pub y: Scale,
+    pub x: u32,
+    pub y: u32,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Debug)]

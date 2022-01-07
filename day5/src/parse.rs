@@ -1,6 +1,7 @@
-use crate::lines::{Line, Point, Scale};
+use crate::lines::{Line, Point};
 use nom::{
-    bytes::complete::{tag, take_while},
+    bytes::complete::tag,
+    character::complete::{char, digit1, newline},
     combinator::{map, map_res},
     multi::separated_list1,
     sequence::separated_pair,
@@ -13,26 +14,25 @@ use std::str::FromStr;
 /// If successful, it returns the match, plus the remaining part of the input string which wasn't consumed.
 fn parse_line(input: &str) -> IResult<&str, Line> {
     // Parse two points, separated by an arrow
-    let parser = separated_pair(parse_point, tag(" -> "), parse_point);
+    let parse_two_points = separated_pair(parse_point, tag(" -> "), parse_point);
     // If the parse succeeded, put those two points into a Line
-    map(parser, |(p0, p1)| Line(p0, p1))(input)
+    map(parse_two_points, |(p0, p1)| Line(p0, p1))(input)
 }
 
 /// Parse a point from the start of the input string.
 fn parse_point(input: &str) -> IResult<&str, Point> {
-    let parser = separated_pair(parse_numbers, tag(","), parse_numbers);
-    map(parser, |(x, y)| Point { x, y })(input)
+    let parse_two_numbers = separated_pair(parse_numbers, char(','), parse_numbers);
+    map(parse_two_numbers, |(x, y)| Point { x, y })(input)
 }
 
-/// Parse a `Scale` from the start of the input string.
-pub fn parse_numbers(input: &str) -> IResult<&str, Scale> {
-    let parse_digits = take_while(|c: char| c.is_digit(10));
-    map_res(parse_digits, Scale::from_str)(input)
+/// Parse a `u32` from the start of the input string.
+pub fn parse_numbers(input: &str) -> IResult<&str, u32> {
+    map_res(digit1, u32::from_str)(input)
 }
 
-// Parse the whole input.
+// Parse the whole problem input.
 pub fn parse_input(s: &str) -> Vec<Line> {
-    let (remaining_input, lines) = separated_list1(tag("\n"), parse_line)(s).unwrap();
+    let (remaining_input, lines) = separated_list1(newline, parse_line)(s).unwrap();
     assert!(remaining_input.is_empty());
     lines
 }
