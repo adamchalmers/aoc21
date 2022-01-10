@@ -1,11 +1,29 @@
-use crate::magnitude::{parse_magnitude, parse_number};
 use crate::reduction::reduce;
-use nom::multi::many0;
+use crate::tokenparser::parse_magnitude;
+use nom::{bytes::complete::take_while, combinator::map_res, multi::many0, IResult};
 use std::str::FromStr;
 
 /// A linear representation of snailfish numbers.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct TokenStream(pub Vec<Token>);
+pub struct TokenStream {
+    pub tokens: Vec<Token>,
+    pub pos: usize,
+}
+
+impl TokenStream {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, pos: 0 }
+    }
+    pub fn pop(&mut self) -> Option<Token> {
+        match self.tokens.get(self.pos) {
+            None => None,
+            Some(token) => {
+                self.pos += 1;
+                Some(*token)
+            }
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Token {
@@ -13,6 +31,18 @@ pub enum Token {
     Close,
     Num(u16),
     Comma,
+}
+
+impl Token {
+    pub fn same_variant(t0: &Token, t1: &Token) -> bool {
+        matches!(
+            (t0, t1),
+            (Token::Open, Token::Open)
+                | (Token::Close, Token::Close)
+                | (Token::Num(_), Token::Num(_))
+                | (Token::Comma, Token::Comma)
+        )
+    }
 }
 
 impl FromStr for TokenStream {
@@ -37,21 +67,30 @@ impl TokenStream {
 
         // Parse the token stream.
         let p_any_token = alt((p_open, p_close, p_num, p_comma));
-        map(many0(p_any_token), TokenStream)(input)
+        map(many0(p_any_token), TokenStream::new)(input)
     }
 
     pub fn magnitude(self) -> u16 {
-        parse_magnitude(&self.to_string())
+        parse_magnitude(self)
     }
 }
 
+// Parse a sequence of digits into a number.
+pub fn parse_number(input: &str) -> IResult<&str, u16> {
+    map_res(take_while(|c: char| c.is_digit(10)), |input: &str| {
+        input.parse()
+    })(input)
+}
+
+#[cfg(test)]
 impl std::fmt::Display for TokenStream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: String = self.0.iter().map(|token| token.to_string()).collect();
+        let s: String = self.tokens.iter().map(|token| token.to_string()).collect();
         write!(f, "{}", s)
     }
 }
 
+#[cfg(test)]
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -70,13 +109,13 @@ impl std::ops::Add for TokenStream {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut tokens = Vec::with_capacity(self.0.len() + rhs.0.len() + 3);
+        let mut tokens = Vec::with_capacity(self.tokens.len() + rhs.tokens.len() + 3);
         tokens.push(Token::Open);
-        tokens.extend(self.0);
+        tokens.extend(self.tokens);
         tokens.push(Token::Comma);
-        tokens.extend(rhs.0);
+        tokens.extend(rhs.tokens);
         tokens.push(Token::Close);
-        let ts = TokenStream(tokens);
+        let ts = TokenStream::new(tokens);
         reduce(ts)
     }
 }
@@ -85,12 +124,12 @@ impl std::ops::Add<&Self> for TokenStream {
     type Output = Self;
 
     fn add(self, rhs: &Self) -> Self::Output {
-        let mut combined = Vec::with_capacity(self.0.len() + rhs.0.len());
+        let mut combined = Vec::with_capacity(self.tokens.len() + rhs.tokens.len());
         combined.push(Token::Open);
-        combined.extend(self.0);
+        combined.extend(self.tokens);
         combined.push(Token::Comma);
-        combined.extend(rhs.0.iter().copied());
+        combined.extend(rhs.tokens.iter().copied());
         combined.push(Token::Close);
-        reduce(TokenStream(combined))
+        reduce(TokenStream::new(combined))
     }
 }

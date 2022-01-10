@@ -11,8 +11,8 @@ pub fn reduce(mut ts: TokenStream) -> TokenStream {
 
 /// Returns true if a number was split.
 fn apply_split(ts: &mut TokenStream) -> bool {
-    let (new_tokens, split_done) = ts.0.iter().fold(
-        (Vec::with_capacity(ts.0.len()), false),
+    let (new_tokens, split_done) = ts.tokens.iter().fold(
+        (Vec::with_capacity(ts.tokens.len()), false),
         |(mut new_tokens, mut split_done), token| {
             match token {
                 Token::Num(n) if n >= &SPLIT_SIZE && !split_done => {
@@ -31,7 +31,7 @@ fn apply_split(ts: &mut TokenStream) -> bool {
             (new_tokens, split_done)
         },
     );
-    ts.0 = new_tokens;
+    ts.tokens = new_tokens;
     split_done
 }
 
@@ -53,13 +53,13 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
         Done,
     }
 
-    let mut new_tokens = Vec::with_capacity(ts.0.len());
+    let mut new_tokens = Vec::with_capacity(ts.tokens.len());
     let mut explode = Explode::None;
     let mut depth = 0u8;
     let mut i = 0;
 
-    while i < ts.0.len() {
-        let token = ts.0[i];
+    while i < ts.tokens.len() {
+        let token = ts.tokens[i];
         match token {
             Token::Comma => {}
             Token::Open => depth += 1,
@@ -67,8 +67,8 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
             Token::Num(n) => match explode {
                 Explode::Done => {}
                 Explode::None => {
-                    if depth > EXPLODE_DEPTH && ts.0[i + 1] == Token::Comma {
-                        if let Token::Num(n_right) = ts.0[i + 2] {
+                    if depth > EXPLODE_DEPTH && ts.tokens[i + 1] == Token::Comma {
+                        if let Token::Num(n_right) = ts.tokens[i + 2] {
                             explode = Explode::Carry(n_right);
                             add_to(&mut new_tokens, n);
                             let len = new_tokens.len();
@@ -90,7 +90,7 @@ fn apply_explode(ts: &mut TokenStream) -> bool {
         new_tokens.push(token);
         i += 1;
     }
-    ts.0 = new_tokens;
+    ts.tokens = new_tokens;
     !matches!(explode, Explode::None)
 }
 
