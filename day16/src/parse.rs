@@ -86,9 +86,8 @@ impl Packet {
     /// Parse a Packet from a sequence of bits.
     fn parse_from_bits(i: BitInput) -> IResult<BitInput, Self> {
         let (i, header) = Header::parse(i)?;
-        Ok(match header.type_id {
-            4 => {
-                let (i, value) = parse_literal_number(i)?;
+        match header.type_id {
+            4 => parse_literal_number(i).map(|(i, value)| {
                 (
                     i,
                     Self::Literal {
@@ -96,9 +95,8 @@ impl Packet {
                         value,
                     },
                 )
-            }
-            other => {
-                let (i, (subpackets, type_id)) = parse_operator(i, other)?;
+            }),
+            other => parse_operator(i, other).map(|(i, (subpackets, type_id))| {
                 (
                     i,
                     Self::Operator {
@@ -107,8 +105,8 @@ impl Packet {
                         type_id,
                     },
                 )
-            }
-        })
+            }),
+        }
     }
 }
 
