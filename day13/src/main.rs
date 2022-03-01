@@ -68,16 +68,10 @@ impl Fold {
 
     /// Fold the set of holes along this fold.
     fn apply(&self, points: HashSet<Point>) -> HashSet<Point> {
-        let (to_change, to_keep): (HashSet<_>, _) =
-            points.into_iter().partition(|p| self.changes(p));
-
-        // Keep the points above the fold,
-        // Change the points that got folded.
-        let mut new_points = to_keep;
-        for point in to_change {
-            new_points.insert(self.reflect(point));
-        }
-        new_points
+        points
+            .into_iter()
+            .map(|p| if self.changes(&p) { self.reflect(p) } else { p })
+            .collect()
     }
 }
 
@@ -99,11 +93,11 @@ impl Problem {
         const FOLD_PREFIX: &str = "fold along ";
         let folds = lines
             .map(|l| {
-                let line = l.chars().collect::<Vec<_>>();
+                let line: Vec<_> = l.chars().collect();
                 let dir = line[FOLD_PREFIX.len()].try_into().unwrap();
                 let val = line[FOLD_PREFIX.len() + 2..]
-                    .to_vec()
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .collect::<String>()
                     .parse()
                     .unwrap();
